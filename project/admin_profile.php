@@ -1,3 +1,7 @@
+<?php
+require_once 'db_connect.php';
+require_admin();
+?>
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -133,9 +137,7 @@
     <h2>ข้อมูลพนักงาน</h2>
 
     <?php
-    include 'db_connect.php';
-
-    $sql = "SELECT employees_id, employees_firstname, employees_lastname, department, salary FROM employees";
+    $sql = "SELECT employees_id, employees_firstname, employees_lastname, department, salary FROM employees ORDER BY employees_id";
     $result = $conn->query($sql);
 
     if ($result->num_rows > 0) {
@@ -149,10 +151,10 @@
                 </tr>";
         while ($row = $result->fetch_assoc()) {
             echo "<tr>
-                    <td>" . $row["employees_id"] . "</td>
-                    <td>" . $row["employees_firstname"] . "</td>
-                    <td>" . $row["employees_lastname"] . "</td>
-                    <td>" . $row["department"] . "</td>
+                    <td>" . e($row["employees_id"]) . "</td>
+                    <td>" . e($row["employees_firstname"]) . "</td>
+                    <td>" . e($row["employees_lastname"]) . "</td>
+                    <td>" . e($row["department"]) . "</td>
                     <td>" . number_format($row["salary"], 2) . " บาท</td>
                 </tr>";
         }

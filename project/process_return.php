@@ -1,46 +1,59 @@
 <?php
-include 'db_connect.php';
-session_start();
+require_once 'db_connect.php';
 
-if (!isset($_SESSION["customers_id"])) {
-    header("Location: login.php");
-    exit();
+$customer_id = require_customer();
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    redirect("profile.php");
+}
+verify_csrf();
+
+$rental_id = input('rental_id');
+$track_return = strtoupper(input('track_return'));
+
+if (!preg_match('/^[A-Z0-9&\-]{8,50}$/', $track_return)) {
+    flash("เลขพัสดุไม่ถูกต้อง (ตัวอักษรภาษาอังกฤษหรือตัวเลข 8–50 ตัว)");
+    redirect("profile.php");
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $rental_id = $_POST['rental_id'];
-    $track_return = $_POST['track_return'];
-    $postal_code = '73000';
-    $return_date = date("Y-m-d H:i:s");
+// ส่งคืนได้เฉพาะรายการเช่าของตัวเอง ที่ร้านยืนยันแล้ว และยังไม่เคยแจ้งคืน
+$stmt = $conn->prepare("SELECT 1 FROM rentals r
+    WHERE r.rental_id = ? AND r.customers_id = ? AND r.rental_status = 'Complete'
+      AND NOT EXISTS (SELECT 1 FROM track_return t WHERE t.rental_id = r.rental_id)");
+$stmt->bind_param("ss", $rental_id, $customer_id);
+$stmt->execute();
+$allowed = $stmt->get_result()->num_rows === 1;
+$stmt->close();
 
-    $stmt = $conn->prepare("INSERT INTO track_return (rental_id, track_return, postal_code)
-                            VALUES (?, ?, ?) 
-                            ON DUPLICATE KEY UPDATE track_return = ?, postal_code = ?");
-    $stmt->bind_param("sssss", $rental_id, $track_return, $postal_code, $track_return, $postal_code);
-    
-    if ($stmt->execute()) {
+if (!$allowed) {
+    flash("ไม่สามารถแจ้งคืนรายการนี้ได้");
+    redirect("profile.php");
+}
 
-        $result = $conn->query("SELECT return_id FROM returnss ORDER BY return_id DESC LIMIT 1");
-        $latest_return_id = "Ret0010";
-        if ($result->num_rows > 0) {
-            $row = $result->fetch_assoc();
-            $latest_return_num = intval(substr($row["return_id"], 3));
-            $latest_return_id = "Ret" . str_pad($latest_return_num + 1, 4, "0", STR_PAD_LEFT);
-        }
+$store = $conn->query("SELECT postal_code FROM stores LIMIT 1")->fetch_assoc();
+$postal_code = $store['postal_code'] ?? '73000';
+$return_date = date("Y-m-d");
 
-        $update_return_stmt = $conn->prepare("INSERT INTO returnss (return_id, rental_id, return_date) 
-                        VALUES (?, ?, ?) 
-                        ON DUPLICATE KEY UPDATE return_date = ?");
-        $update_return_stmt->bind_param("ssss", $latest_return_id, $rental_id, $return_date, $return_date);
-        $update_return_stmt->execute();
-        $update_return_stmt->close();
-
-        header("Location: profile.php");
-        exit();
-    } else {
-        echo "เกิดข้อผิดพลาดในการบันทึกข้อมูลการคืนสินค้า";
-    }
-
+$conn->begin_transaction();
+try {
+    $stmt = $conn->prepare("INSERT INTO track_return (track_return, rental_id, postal_code, returnl_status) VALUES (?, ?, ?, 'Pending')");
+    $stmt->bind_param("sss", $track_return, $rental_id, $postal_code);
+    $stmt->execute();
     $stmt->close();
+
+    $return_id = next_id($conn, 'returnss', 'return_id', 'Ret', 4);
+    $stmt = $conn->prepare("INSERT INTO returnss (return_id, rental_id, return_date) VALUES (?, ?, ?)");
+    $stmt->bind_param("sss", $return_id, $rental_id, $return_date);
+    $stmt->execute();
+    $stmt->close();
+
+    $conn->commit();
+    flash("บันทึกการส่งคืนแล้ว ร้านจะตรวจสภาพสินค้าเมื่อได้รับของค่ะ");
+} catch (mysqli_sql_exception $e) {
+    $conn->rollback();
+    // 1062 = ข้อมูลซ้ำ เลขพัสดุเป็น primary key ของตาราง track_return
+    flash($e->getCode() === 1062 ? "เลขพัสดุนี้ถูกใช้แจ้งคืนไปแล้ว" : "บันทึกการคืนสินค้าไม่สำเร็จ กรุณาลองใหม่");
+    if ($e->getCode() !== 1062) {
+        error_log('process_return failed: ' . $e->getMessage());
+    }
 }
-?>
+redirect("profile.php");

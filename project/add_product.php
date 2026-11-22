@@ -1,42 +1,32 @@
 <?php
-include 'db_connect.php';
-session_start();
+require_once 'db_connect.php';
+require_admin();
 
-if (!isset($_SESSION["admin_logged_in"])) {
-    header("Location: admin_login.php");
-    exit();
-}
+$success = '';
+$error = '';
 
-function generateProductId($conn) {
-    $sql = "SELECT product_id FROM products ORDER BY product_id DESC LIMIT 1";
-    $result = $conn->query($sql);
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        $lastId = intval(substr($row['product_id'], 2));
-        return 'PD' . str_pad($lastId + 1, 4, '0', STR_PAD_LEFT);
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    verify_csrf();
+    $brand = input('brand');
+    $details = input('details');
+    $daily_rental_price = filter_var($_POST["daily_rental_price"] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+    if ($brand === '' || $details === '') {
+        $error = "กรุณากรอกยี่ห้อและรายละเอียดสินค้า";
+    } elseif ($daily_rental_price === false) {
+        $error = "ราคาเช่าต้องเป็นจำนวนเต็มมากกว่า 0";
     } else {
-        return 'PD0011';
+        // สร้างรหัสตอนบันทึก เพื่อไม่ให้รหัสซ้ำเมื่อมีการเพิ่มสินค้าจากหลายหน้าพร้อมกัน
+        $product_id = next_id($conn, 'products', 'product_id', 'PD', 4);
+        $stmt = $conn->prepare("INSERT INTO products (product_id, brand, details, daily_rental_price) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("sssi", $product_id, $brand, $details, $daily_rental_price);
+        $stmt->execute();
+        $stmt->close();
+        $success = "เพิ่มสินค้า " . $product_id . " สำเร็จ";
     }
 }
 
-$product_id = generateProductId($conn);
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $brand = $_POST["brand"];
-    $details = $_POST["details"];
-    $daily_rental_price = $_POST["daily_rental_price"];
-
-    $sql = "INSERT INTO products (product_id, brand, details, daily_rental_price) VALUES (?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sssi", $product_id, $brand, $details, $daily_rental_price);
-
-    if ($stmt->execute()) {
-        $success = "เพิ่มสินค้าสำเร็จ!";
-        $product_id = generateProductId($conn);
-    } else {
-        $error = "เกิดข้อผิดพลาด: " . $conn->error;
-    }
-}
+$product_id = next_id($conn, 'products', 'product_id', 'PD', 4);
 ?>
 
 <!DOCTYPE html>
@@ -161,27 +151,28 @@ footer {
         <h2>เพิ่มสินค้าใหม่</h2>
 
         <?php if (!empty($success)): ?>
-            <div class="success"> <?php echo $success; ?> </div>
+            <div class="success"> <?php echo e($success); ?> </div>
         <?php elseif (!empty($error)): ?>
-            <div class="error"> <?php echo $error; ?> </div>
+            <div class="error"> <?php echo e($error); ?> </div>
         <?php endif; ?>
 
         <form method="POST">
+            <?php echo csrf_field(); ?>
             <div class="input-group">
                 <label>รหัสสินค้า (อัตโนมัติ)</label>
-                <input type="text" value="<?php echo $product_id; ?>" disabled>
+                <input type="text" value="<?php echo e($product_id); ?>" disabled>
             </div>
             <div class="input-group">
                 <label>ยี่ห้อสินค้า:</label>
-                <input type="text" name="brand" required>
+                <input type="text" name="brand" maxlength="50" required>
             </div>
             <div class="input-group">
                 <label>รายละเอียดสินค้า:</label>
-                <input type="text" name="details" required>
+                <input type="text" name="details" maxlength="100" required>
             </div>
             <div class="input-group">
                 <label>ราคาเช่ารายวัน (บาท):</label>
-                <input type="number" name="daily_rental_price" required>
+                <input type="number" name="daily_rental_price" min="1" step="1" required>
             </div>
             <button type="submit">เพิ่มสินค้า</button>
         </form>

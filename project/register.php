@@ -1,51 +1,57 @@
 <?php
-include 'db_connect.php';
+require_once 'db_connect.php';
 
 $error = "";
+$genders = ['Male', 'Female', 'Other'];
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $firstname = $_POST['firstname'];
-    $lastname = $_POST['lastname'];
-    $gender = $_POST['gender'];
-    $email = $_POST['email'];
-    $phonenumber = $_POST['phonenumber'];
-    $address = $_POST['address'];
-    $postal_code = $_POST['postal_code'];
-    $password = $_POST['password'];
-    $customers_member = 'no';
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    verify_csrf();
+    $firstname = input('firstname');
+    $lastname = input('lastname');
+    $gender = input('gender');
+    $email = input('email');
+    $phonenumber = input('phonenumber');
+    $address = input('address');
+    $postal_code = input('postal_code');
+    $password = input('password', false);
 
-    $stmt = $conn->prepare("SELECT * FROM customers WHERE email = ?");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows > 0) {
-        $error = "อีเมลนี้มีในระบบแล้ว!";
+    if ($firstname === '' || $lastname === '' || $address === '') {
+        $error = "กรุณากรอกข้อมูลให้ครบ";
+    } elseif (!in_array($gender, $genders, true)) {
+        $error = "กรุณาเลือกเพศ";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "รูปแบบอีเมลไม่ถูกต้อง";
+    } elseif (strlen($password) < 8) {
+        $error = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+    } elseif (!preg_match('/^[0-9\-+ ]{9,15}$/', $phonenumber)) {
+        $error = "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง";
+    } elseif (!preg_match('/^[0-9]{5}$/', $postal_code)) {
+        $error = "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก";
     } else {
+        $stmt = $conn->prepare("SELECT 1 FROM customers WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $exists = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
 
-    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-
-    $stmt = $conn->prepare("SELECT MAX(SUBSTRING(customers_id, 2)) AS last_id FROM customers");
-    $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $last_id = $row['last_id'] ? (int)$row['last_id'] : 11;
-        $new_id = 'C' . str_pad($last_id + 1, 3, '0', STR_PAD_LEFT);
-
-        $stmt = $conn->prepare("INSERT INTO customers (customers_id, customers_firstname, customers_lastname,
-        gender, customers_member, email, phonenumber, address, postal_code, password) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssssssss", $new_id, $firstname, $lastname, $gender, $customers_member, $email, $phonenumber, $address, $postal_code, $hashed_password);
-
-        if ($stmt->execute()) {
-            header("Location: login.php");
-            exit();
+        if ($exists) {
+            $error = "อีเมลนี้มีในระบบแล้ว";
         } else {
-            $error = "ไม่สามารถสมัครสมาชิกได้ กรุณาลองใหม่อีกครั้ง";
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $new_id = next_id($conn, 'customers', 'customers_id', 'C', 3);
+            $customers_member = 'no';
+
+            $stmt = $conn->prepare("INSERT INTO customers (customers_id, customers_firstname, customers_lastname,
+            gender, customers_member, email, phonenumber, address, postal_code, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("ssssssssss", $new_id, $firstname, $lastname, $gender, $customers_member, $email, $phonenumber, $address, $postal_code, $hashed_password);
+            $stmt->execute();
+            $stmt->close();
+            redirect("login.php");
         }
     }
-    $stmt->close();
 }
+$old = fn($key) => e($_POST[$key] ?? '');
 ?>
 
 <!DOCTYPE html>
@@ -167,47 +173,44 @@ button:hover {
         <h2>สมัครสมาชิก</h2>
         
         <?php if (!empty($error)): ?>
-            <div class="error"><?php echo $error; ?></div>
+            <div class="error"><?php echo e($error); ?></div>
         <?php endif; ?>
-        
+
         <form method="POST">
+            <?php echo csrf_field(); ?>
             <div class="input-group">
                 <label for="firstname">ชื่อ:</label>
-                <input type="text" name="firstname" id="firstname" required>
+                <input type="text" name="firstname" id="firstname" maxlength="50" value="<?php echo $old('firstname'); ?>" required>
                 <label for="lastname">นามสกุล:</label>
-                <input type="text" name="lastname" id="lastname" required>
+                <input type="text" name="lastname" id="lastname" maxlength="50" value="<?php echo $old('lastname'); ?>" required>
             </div>
             <div class="gender-group">
                 <label>เพศ:</label>
-                <label for="male">
-                    <input type="radio" name="gender" id="male" value="Male" required> male
+                <?php foreach (['Male' => 'male', 'Female' => 'female', 'Other' => 'other'] as $value => $label): ?>
+                <label for="<?php echo $label; ?>">
+                    <input type="radio" name="gender" id="<?php echo $label; ?>" value="<?php echo $value; ?>" <?php echo (input('gender')) === $value ? 'checked' : ''; ?> required> <?php echo $label; ?>
                 </label>
-                <label for="female">
-                    <input type="radio" name="gender" id="female" value="Female" required> female
-                </label>
-                <label for="other">
-                    <input type="radio" name="gender" id="other" value="Other" required> other
-                </label>
+                <?php endforeach; ?>
             </div>
             <div class="input-group">
                 <label for="email">อีเมล:</label>
-                <input type="email" name="email" id="email" required>
+                <input type="email" name="email" id="email" maxlength="100" value="<?php echo $old('email'); ?>" required>
             </div>
             <div class="input-group">
-                <label for="password">รหัสผ่าน:</label>
-                <input type="password" name="password" id="password" required>
+                <label for="password">รหัสผ่าน (อย่างน้อย 8 ตัวอักษร):</label>
+                <input type="password" name="password" id="password" minlength="8" required>
             </div>
             <div class="input-group">
                 <label for="phonenumber">เบอร์โทรศัพท์:</label>
-                <input type="tel" name="phonenumber" id="phonenumber" required>
+                <input type="tel" name="phonenumber" id="phonenumber" maxlength="15" value="<?php echo $old('phonenumber'); ?>" required>
             </div>
             <div class="input-group">
                 <label for="address">ที่อยู่:</label>
-                <input type="text" name="address" id="address" required>
+                <input type="text" name="address" id="address" maxlength="200" value="<?php echo $old('address'); ?>" required>
             </div>
             <div class="input-group">
                 <label for="postal_code">รหัสไปรษณีย์:</label>
-                <input type="text" name="postal_code" id="postal_code" required>
+                <input type="text" name="postal_code" id="postal_code" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" value="<?php echo $old('postal_code'); ?>" required>
             </div>
             <button type="submit">สมัครสมาชิก</button>
         </form>

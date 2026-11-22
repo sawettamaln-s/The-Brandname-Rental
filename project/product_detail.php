@@ -1,58 +1,42 @@
 <?php
-session_start();
-include 'db_connect.php';
+require_once 'db_connect.php';
 
-$product_id = isset($_GET['product_id']) ? $_GET['product_id'] : null;
+$product_id = isset($_GET['product_id']) && is_string($_GET['product_id']) ? $_GET['product_id'] : '';
 
-if ($product_id) {
-    $sql = "SELECT * FROM products WHERE product_id = '$product_id'";
-    $result = $conn->query($sql);
+$stmt = $conn->prepare("SELECT * FROM products WHERE product_id = ?");
+$stmt->bind_param("s", $product_id);
+$stmt->execute();
+$product = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-    if ($result->num_rows == 1) {
-        $product = $result->fetch_assoc();
-    } else {
-        die("ไม่พบข้อมูลสินค้า");
-    }
-} else {
-    die("ไม่มีข้อมูลสินค้า");
+if (!$product) {
+    http_response_code(404);
+    die("ไม่พบข้อมูลสินค้า");
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $quantity = isset($_POST['quantity']) ? $_POST['quantity'] : 1;
-    $rental_date = isset($_POST['rental_date']) ? $_POST['rental_date'] : null;
+$error = '';
+$today = date('Y-m-d');
 
-    if ($rental_date) {
-        $formatted_date = $rental_date;
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    verify_csrf();
+    $days = filter_var($_POST['quantity'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => MAX_RENTAL_DAYS]]);
+    $rental_date = input('rental_date');
+    $date = DateTime::createFromFormat('!Y-m-d', $rental_date);
+
+    if ($days === false) {
+        $error = "จำนวนวันเช่าต้องอยู่ระหว่าง 1 – " . MAX_RENTAL_DAYS . " วัน";
+    } elseif (!$date || $date->format('Y-m-d') !== $rental_date || $rental_date < $today) {
+        $error = "กรุณาเลือกวันที่เช่าตั้งแต่วันนี้เป็นต้นไป";
     } else {
-        echo "กรุณากรอกวันที่ให้ถูกต้อง";
-        exit;
-    }
-
-    if (!isset($_SESSION['cart'])) {
-        $_SESSION['cart'] = [];
-    }
-
-    $found = false;
-    foreach ($_SESSION['cart'] as &$item) {
-        if ($item['product_id'] == $product_id) {
-            $item['quantity'] += $quantity;
-            $found = true;
-            break;
-        }
-    }
-
-    if (!$found) {
-        $_SESSION['cart'][] = [
-            'product_id' => $product_id,
-            'product_name' => $product['brand'],
-            'product_price' => $product['daily_rental_price'],
-            'quantity' => $quantity,
-            'rental_date' => $formatted_date
+        // ตะกร้าเก็บเฉพาะรหัสสินค้า จำนวนวัน และวันที่เช่า ราคาดึงจากฐานข้อมูลทุกครั้งที่แสดงและตอนยืนยัน
+        // กระเป๋าใบเดียวกันอยู่ในตะกร้าได้รายการเดียว เพิ่มซ้ำจะแทนที่จำนวนวันและวันที่เดิม
+        $_SESSION['cart'][$product['product_id']] = [
+            'product_id' => $product['product_id'],
+            'days' => $days,
+            'rental_date' => $rental_date,
         ];
+        redirect("cart.php");
     }
-
-    header("Location: cart.php");
-    exit();
 }
 ?>
 <!DOCTYPE html>
@@ -233,19 +217,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             <?php if (isset($product)): ?>
                 <div class="product-detail">
-                    <img src="images/<?php echo $product['product_id']; ?>.png" alt="<?php echo $product['brand']; ?>">
+                    <img src="images/<?php echo e($product['product_id']); ?>.png" alt="<?php echo e($product['brand']); ?>">
                     <div class="info">
-                        <h3><?php echo $product['product_id']; ?></h3>
-                        <h3><?php echo $product['brand']; ?></h3>
-                        <p><?php echo $product['details']; ?></p>
+                        <h3><?php echo e($product['product_id']); ?></h3>
+                        <h3><?php echo e($product['brand']); ?></h3>
+                        <p><?php echo e($product['details']); ?></p>
                         <p class="price"><strong>ราคาเช่า:</strong> <?php echo number_format($product['daily_rental_price'], 2); ?> บาท / วัน</p>
 
+                        <?php if ($error !== ''): ?>
+                            <p style="color: red;"><?php echo e($error); ?></p>
+                        <?php endif; ?>
+
                         <form method="POST">
+                            <?php echo csrf_field(); ?>
                             <label for="quantity">จำนวนวัน:</label>
-                            <input type="number" name="quantity" id="quantity" min="1" value="1" required>
-                            
+                            <input type="number" name="quantity" id="quantity" min="1" max="<?php echo MAX_RENTAL_DAYS; ?>" value="<?php echo e($_POST['quantity'] ?? 1); ?>" required>
+
                             <label for="rental_date">วัน/เดือน/ปีที่เช่า:</label>
-                            <input type="date" name="rental_date" id="rental_date" required>
+                            <input type="date" name="rental_date" id="rental_date" min="<?php echo $today; ?>" value="<?php echo e(input('rental_date')); ?>" required>
                             
                             <button type="submit">เพิ่มลงตะกร้า</button>
                         </form>

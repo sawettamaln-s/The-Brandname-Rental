@@ -1,30 +1,27 @@
 <?php
-include 'db_connect.php';
-session_start();
+require_once 'db_connect.php';
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST['email'];
-    $password = $_POST['phonenumber'];
+$error = '';
 
-    $sql = "SELECT * FROM customers WHERE email = ?";
-    $stmt = $conn->prepare($sql);
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    verify_csrf();
+    $email = input('email');
+    $password = input('password', false);
+
+    $stmt = $conn->prepare("SELECT customers_id, customers_firstname, customers_lastname, password FROM customers WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows == 1) {
-        $user = $result->fetch_assoc();
-        if (password_verify($password, $user['password'])) {
-            $_SESSION["customers_id"] = $user["customers_id"];
-            $_SESSION["customers_name"] = $user["customers_firstname"] . " " . $user["customers_lastname"];
-            header("Location: index.php");
-            exit();
-        } else {
-            $error = "รหัสผ่านไม่ถูกต้อง!";
-        }
-    } else {
-        $error = "อีเมลนี้ไม่มีอยู่ในระบบ!";
+    $user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    // แจ้งข้อความเดียวกันทั้งกรณีไม่มีอีเมลและรหัสผิด เพื่อไม่ให้เดาได้ว่าอีเมลไหนมีในระบบ
+    if ($user && password_verify($password, $user['password'])) {
+        start_login_session();
+        $_SESSION["customers_id"] = $user["customers_id"];
+        $_SESSION["customers_name"] = $user["customers_firstname"] . " " . $user["customers_lastname"];
+        redirect("index.php");
     }
+    $error = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
 }
 ?>
 
@@ -136,17 +133,18 @@ button:hover {
         <h2>เข้าสู่ระบบ</h2>
         
         <?php if (!empty($error)): ?>
-            <div class="error"> <?php echo $error; ?> </div>
+            <div class="error"> <?php echo e($error); ?> </div>
         <?php endif; ?>
-        
+
         <form method="POST">
+            <?php echo csrf_field(); ?>
             <div class="input-group">
                 <label for="email">อีเมล:</label>
-                <input type="email" name="email" id="email" required>
+                <input type="email" name="email" id="email" value="<?php echo e($_POST['email'] ?? ''); ?>" required>
             </div>
             <div class="input-group">
-                <label for="phonenumber">รหัสผ่าน :</label>
-                <input type="password" name="phonenumber" id="phonenumber" required>
+                <label for="password">รหัสผ่าน :</label>
+                <input type="password" name="password" id="password" required>
             </div>
             <button type="submit">เข้าสู่ระบบ</button>
         </form>

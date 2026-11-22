@@ -1,41 +1,20 @@
 <?php
-session_start();
-include 'db_connect.php';
+require_once 'db_connect.php';
 
-if (!isset($_SESSION["customers_id"])) {
-    header("Location: login.php");
-    exit();
+$customer_id = require_customer();
+$customer = find_customer($conn, $customer_id);
+if (!$customer) {
+    die("ไม่พบข้อมูลลูกค้า");
 }
 
-$customer_id = $_SESSION["customers_id"];
-$stmt = $conn->prepare("SELECT customers_id, customers_firstname, customers_lastname,
-gender, customers_member, phonenumber, email, address, postal_code FROM customers WHERE customers_id = ?");
-$stmt->bind_param("s", $customer_id);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result->num_rows == 1) {
-    $customer = $result->fetch_assoc();
-} else {
-    echo "ไม่พบข้อมูลลูกค้า";
-    exit();
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['remove'])) {
+    verify_csrf();
+    unset($_SESSION['cart'][input('remove')]);
+    redirect("cart.php");
 }
-$stmt->close();
 
-if (isset($_GET['remove'])) {
-    $remove_id = $_GET['remove'];
-    
-    foreach ($_SESSION['cart'] as $key => $item) {
-        if ($item['product_id'] == $remove_id) {
-            unset($_SESSION['cart'][$key]);
-            break;
-        }
-    }
-
-    $_SESSION['cart'] = array_values($_SESSION['cart']);
-    
-    header("Location: cart.php");
-    exit();
-}
+$lines = cart_lines($conn, $customer);
+$total = array_sum(array_column($lines, 'subtotal'));
 ?>
 
 <!DOCTYPE html>
@@ -137,55 +116,52 @@ if (isset($_GET['remove'])) {
     <main>
         <div class="container">
         <h3>ตะกร้าสินค้า</h3>
+        <?php if ($message = take_flash()): ?>
+            <p style="color: red; font-weight: bold;"><?php echo e($message); ?></p>
+        <?php endif; ?>
 
         <div class="card customer-info">
                 <h2>ข้อมูลลูกค้า</h2>
                 <p><strong>ID:</strong> <?php echo htmlspecialchars($customer['customers_id']); ?></p>
                 <p><strong>ชื่อ:</strong> <?php echo htmlspecialchars($customer['customers_firstname'] . " " . $customer['customers_lastname']); ?></p>
                 <p><strong>เพศ:</strong> <?php echo htmlspecialchars($customer['gender']); ?></p>
-                <p><strong>ประเภทสมาชิก:</strong> <?php echo htmlspecialchars($customer['customers_member']); ?></p>
+                <p><strong>ประเภทสมาชิก:</strong> <?php echo is_member($customer) ? 'สมาชิก (ไม่ต้องวางมัดจำ)' : 'ทั่วไป (มัดจำ ' . number_format(DEPOSIT_FEE) . ' บาทต่อใบ)'; ?></p>
                 <p><strong>อีเมล:</strong> <?php echo htmlspecialchars($customer['email']); ?></p>
                 <p><strong>เบอร์โทร:</strong> <?php echo htmlspecialchars($customer['phonenumber']); ?></p>
                 <p><strong>ที่อยู่:</strong> <?php echo htmlspecialchars($customer['address']); ?></p>
                 <p><strong>รหัสไปรษณีย์:</strong> <?php echo htmlspecialchars($customer['postal_code']); ?></p>
             </div>
 
-            <?php if (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
+            <?php if (count($lines) > 0): ?>
                 <table>
                     <tr>
                         <th>สินค้า</th>
-                        <th>จำนวน</th>
-                        <th>วันเช่า</th>
-                        <th>ราคา</th>
-                        <th>รวม</th>
+                        <th>จำนวนวัน</th>
+                        <th>วันที่เช่า</th>
+                        <th>ราคา/วัน</th>
+                        <th>ค่าเช่า</th>
+                        <th>ค่ามัดจำ</th>
                         <th>ลบ</th>
                     </tr>
-                    <?php
-                    $total = 0;
-                    foreach ($_SESSION['cart'] as $item):
-                        $total += $item['product_price'] * $item['quantity'];
-                    ?>
+                    <?php foreach ($lines as $line): ?>
                         <tr>
-                            <td><?php echo $item['product_name']; ?></td>
-                            <td><?php echo $item['quantity']; ?></td>
-                            <td><?php echo $item['rental_date']; ?></td>
-                            <td><?php echo number_format($item['product_price'], 2); ?> บาท</td>
-                            <td><?php echo number_format($item['product_price'] * $item['quantity'], 2); ?> บาท</td>
+                            <td><?php echo e($line['brand'] . ' ' . $line['details']); ?></td>
+                            <td><?php echo $line['days']; ?></td>
+                            <td><?php echo e($line['rental_date']); ?></td>
+                            <td><?php echo number_format($line['daily_rental_price'], 2); ?> บาท</td>
+                            <td><?php echo number_format($line['rent'], 2); ?> บาท</td>
+                            <td><?php echo number_format($line['deposit'], 2); ?> บาท</td>
                             <td>
-                                <a href="cart.php?remove=<?php echo $item['product_id']; ?>" class="remove-btn">ลบ</a>
+                                <form method="POST" style="margin: 0;">
+                                    <?php echo csrf_field(); ?>
+                                    <button type="submit" name="remove" value="<?php echo e($line['product_id']); ?>" class="remove-btn">ลบ</button>
+                                </form>
                             </td>
                         </tr>
                     <?php endforeach; ?>
 
-                    <?php
-                    if ($customer['customers_member'] === 'no') {
-                        echo "<tr><td colspan='5' style='text-align:right;'>ค่ามัดจำ: -900 บาท</td></tr>";
-                        $total += 900;
-                    }
-                    ?>
-
                     <tr>
-                        <td colspan="3" style="text-align:right; font-weight: bold;">รวมทั้งหมด:</td>
+                        <td colspan="5" style="text-align:right; font-weight: bold;">รวมทั้งหมด (ค่าเช่า + ค่ามัดจำ):</td>
                         <td colspan="2" style="text-align:right;"><?php echo number_format($total, 2); ?> บาท</td>
                     </tr>
                 </table>

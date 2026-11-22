@@ -1,50 +1,42 @@
 <?php
-include 'db_connect.php';
-session_start();
+require_once 'db_connect.php';
+require_admin();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    if (isset($_POST['confirm'])) {
-        $rental_id = $_POST['rental_id'];
+// ยืนยัน (Complete) = ของสภาพดี คืนมัดจำครึ่งหนึ่ง, ชำรุด (Cancel) = ร้านยึดมัดจำทั้งหมด
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    verify_csrf();
+    $rental_id = input('rental_id');
+    $new_status = isset($_POST['confirm']) ? 'Complete' : (isset($_POST['cancel']) ? 'Cancel' : null);
 
-        $update_stmt = $conn->prepare("UPDATE track_return SET returnl_status = 'Complete' WHERE rental_id = ? AND returnl_status = 'Pending'");
-        $update_stmt->bind_param("s", $rental_id);
+    if ($new_status !== null) {
+        $update_stmt = $conn->prepare("UPDATE track_return SET returnl_status = ? WHERE rental_id = ? AND returnl_status = 'Pending'");
+        $update_stmt->bind_param("ss", $new_status, $rental_id);
         $update_stmt->execute();
 
         if ($update_stmt->affected_rows > 0) {
-            $_SESSION['message'] = "ยืนยันการคืนสินค้าเรียบร้อยแล้ว";
+            flash($new_status === 'Complete' ? "บันทึก $rental_id: สภาพดี คืนมัดจำครึ่งหนึ่ง" : "บันทึก $rental_id: ชำรุด ยึดมัดจำทั้งหมด");
         } else {
-            $_SESSION['message'] = "ไม่สามารถยืนยันการคืนสินค้าได้ หรือคำสั่งซื้อไม่อยู่ในสถานะ Pending";
+            flash("ไม่สามารถเปลี่ยนสถานะได้ หรือรายการไม่อยู่ในสถานะรอตรวจ");
         }
         $update_stmt->close();
     }
-
-    if (isset($_POST['cancel'])) {
-        $rental_id = $_POST['rental_id'];
-
-        $update_stmt = $conn->prepare("UPDATE track_return SET returnl_status = 'Cancel' WHERE rental_id = ? AND returnl_status = 'Pending'");
-        $update_stmt->bind_param("s", $rental_id);
-        $update_stmt->execute();
-
-        if ($update_stmt->affected_rows > 0) {
-            $_SESSION['message'] = "ยกเลิกการคืนสินค้าเรียบร้อยแล้ว";
-        } else {
-            $_SESSION['message'] = "ไม่สามารถยกเลิกการคืนสินค้าได้ หรือคำสั่งซื้อไม่อยู่ในสถานะ Pending";
-        }
-        $update_stmt->close();
-    }
-
-    header("Location: admin_return.php");
-    exit();
+    redirect("admin_return.php");
 }
 
-$stmt = $conn->prepare("SELECT t.rental_id, r.customers_id, r.product_id, t.track_return, t.returnl_status, c.customers_firstname, c.customers_lastname
-                        FROM track_return t
-                        JOIN rentals r ON t.rental_id = r.rental_id
-                        JOIN customers c ON r.customers_id = c.customers_id
-                        WHERE t.returnl_status = 'Pending'");
+$stmt = $conn->prepare("SELECT t.rental_id, r.customers_id, r.product_id, p.brand, r.deposit_fee, t.track_return, rs.return_date,
+    c.customers_firstname, c.customers_lastname
+    FROM track_return t
+    JOIN rentals r ON t.rental_id = r.rental_id
+    JOIN customers c ON r.customers_id = c.customers_id
+    LEFT JOIN products p ON p.product_id = r.product_id
+    LEFT JOIN returnss rs ON rs.rental_id = t.rental_id
+    WHERE t.returnl_status = 'Pending'
+    ORDER BY t.rental_id");
 $stmt->execute();
 $rental_result = $stmt->get_result();
 $stmt->close();
+
+$message = take_flash();
 ?>
 
 <!DOCTYPE html>
@@ -61,48 +53,45 @@ $stmt->close();
     <h1>THE BRANDNAME RENTAL - ADMIN</h1>
 </header>
 
-
 <main>
     <div class="container">
         <h2>จัดการสถานะการคืนสินค้า</h2>
+        <p>ตรวจสภาพกระเป๋าเมื่อได้รับของ สภาพดีกด "สภาพดี" (คืนมัดจำครึ่งหนึ่ง) ชำรุดกด "ชำรุด" (ยึดมัดจำทั้งหมด)</p>
 
-        <?php if (isset($_SESSION['message'])): ?>
-            <div class="alert">
-                <?php echo $_SESSION['message']; ?>
-                <?php unset($_SESSION['message']); ?>
-            </div>
+        <?php if ($message): ?>
+            <div class="alert"><?php echo e($message); ?></div>
         <?php endif; ?>
 
         <?php if ($rental_result->num_rows > 0): ?>
             <table>
                 <tr>
                     <th>รหัสการเช่า</th>
-                    <th>รหัสลูกค้า</th>
-                    <th>ชื่อ-นามสกุลลูกค้า</th>
+                    <th>ลูกค้า</th>
                     <th>สินค้า</th>
-                    <th>รหัสส่งสินค้า</th>
-                    <th>สถานะการคืน</th>
+                    <th>เลขพัสดุที่ส่งคืน</th>
+                    <th>วันที่แจ้งส่งคืน</th>
+                    <th>ค่ามัดจำ</th>
                     <th>จัดการ</th>
                 </tr>
                 <?php while ($rental = $rental_result->fetch_assoc()): ?>
                     <tr>
-                        <td><?php echo $rental['rental_id']; ?></td>
-                        <td><?php echo $rental['customers_id']; ?></td>
-                        <td><?php echo $rental['customers_firstname'] . " " . $rental['customers_lastname']; ?></td>
-                        <td><?php echo $rental['product_id']; ?></td>
-                        <td><?php echo htmlspecialchars($rental['track_return']); ?></td>
-                        <td>
-                            <?php echo $rental['returnl_status'] == 'Pending' ? "<span style='color: orange;'>รอการยืนยัน</span>" : ""; ?>
-                        </td>
+                        <td><?php echo e($rental['rental_id']); ?></td>
+                        <td><?php echo e($rental['customers_id'] . ' ' . $rental['customers_firstname'] . ' ' . $rental['customers_lastname']); ?></td>
+                        <td><?php echo e($rental['product_id'] . ' ' . $rental['brand']); ?></td>
+                        <td><?php echo e($rental['track_return']); ?></td>
+                        <td><?php echo e($rental['return_date'] ?? '-'); ?></td>
+                        <td><?php echo number_format((int) $rental['deposit_fee']); ?> บาท</td>
                         <td>
                             <form action="admin_return.php" method="POST" style="display: inline;">
-                                <input type="hidden" name="rental_id" value="<?php echo $rental['rental_id']; ?>">
-                                <button type="submit" name="confirm" class="btn btn-confirm" <?php echo $rental['returnl_status'] != 'Pending' ? 'disabled' : ''; ?>>ยืนยันการคืน</button>
+                                <?php echo csrf_field(); ?>
+                                <input type="hidden" name="rental_id" value="<?php echo e($rental['rental_id']); ?>">
+                                <button type="submit" name="confirm" class="btn btn-confirm">สภาพดี</button>
                             </form>
 
-                            <form action="admin_return.php" method="POST" style="display: inline;">
-                                <input type="hidden" name="rental_id" value="<?php echo $rental['rental_id']; ?>">
-                                <button type="submit" name="cancel" class="btn btn-cancel" <?php echo $rental['returnl_status'] != 'Pending' ? 'disabled' : ''; ?>>ยกเลิกการคืน</button>
+                            <form action="admin_return.php" method="POST" style="display: inline;" onsubmit="return confirm('บันทึกว่าสินค้าชำรุดและยึดมัดจำทั้งหมด?');">
+                                <?php echo csrf_field(); ?>
+                                <input type="hidden" name="rental_id" value="<?php echo e($rental['rental_id']); ?>">
+                                <button type="submit" name="cancel" class="btn btn-cancel">ชำรุด</button>
                             </form>
                         </td>
                     </tr>

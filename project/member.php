@@ -1,53 +1,39 @@
 <?php
-include 'db_connect.php';
-session_start();
+require_once 'db_connect.php';
 
-if (!isset($_SESSION["customers_id"])) {
-    header("Location: login.php");
-    exit();
+$customer_id = require_customer();
+$user = find_customer($conn, $customer_id);
+if (!$user) {
+    die("ไม่พบข้อมูลผู้ใช้");
 }
 
-$customer_id = $_SESSION["customers_id"];
-$sql = "SELECT * FROM customers WHERE customers_id = '$customer_id'";
-$result = $conn->query($sql);
-
-if ($result->num_rows == 1) {
-    $user = $result->fetch_assoc();
-} else {
-    echo "ไม่พบข้อมูลผู้ใช้";
-    exit();
+function has_pending_request(mysqli $conn, string $customer_id): bool
+{
+    $stmt = $conn->prepare("SELECT 1 FROM membership_requests WHERE customers_id = ? AND status = 'Pending'");
+    $stmt->bind_param("s", $customer_id);
+    $stmt->execute();
+    $pending = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+    return $pending;
 }
 
-$subscription_end_date = date('Y-m-d', strtotime('+1 year'));
+$already_member = is_member($user);
+$pending = has_pending_request($conn, $customer_id);
+$upload_error = '';
 
-$upload_message = '';
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['payment_slip'])) {
-    $upload_dir = 'uploads/';
-    $upload_file = $upload_dir . basename($_FILES['payment_slip']['name']);
-    $upload_ok = 1;
-    $image_file_type = strtolower(pathinfo($upload_file, PATHINFO_EXTENSION));
-
-    if (getimagesize($_FILES['payment_slip']['tmp_name']) === false) {
-        $upload_message = "กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น";
-        $upload_ok = 0;
-    }
-
-    if ($_FILES['payment_slip']['size'] > 500000) {
-        $upload_message = "ขออภัย ไฟล์ของคุณใหญ่เกินไป";
-        $upload_ok = 0;
-    }
-
-    if ($upload_ok == 0) {
-        $upload_message = "ขออภัย ไม่สามารถอัปโหลดไฟล์ของคุณได้";
+// ลูกค้าแนบสลิปแล้วระบบสร้างคำขอรออนุมัติ สถานะสมาชิกเปลี่ยนเมื่อแอดมินตรวจสลิปและอนุมัติเท่านั้น
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$already_member && !$pending) {
+    verify_csrf();
+    $saved = save_slip($_FILES['payment_slip'] ?? null);
+    if (isset($saved['error'])) {
+        $upload_error = $saved['error'];
     } else {
-        if (move_uploaded_file($_FILES['payment_slip']['tmp_name'], $upload_file)) {
-
-            $_SESSION['payment_slip_uploaded'] = true;
-            $_SESSION['uploaded_file'] = $upload_file;
-            $upload_message = "อัปโหลดสลิปการชำระเงินสำเร็จ!";
-        } else {
-            $upload_message = "ขออภัย เกิดข้อผิดพลาดในการอัปโหลดไฟล์";
-        }
+        $stmt = $conn->prepare("INSERT INTO membership_requests (customers_id, slip_file) VALUES (?, ?)");
+        $stmt->bind_param("ss", $customer_id, $saved['file']);
+        $stmt->execute();
+        $stmt->close();
+        flash("ส่งสลิปสมัครสมาชิกแล้ว ร้านจะตรวจสอบและอนุมัติให้ค่ะ");
+        redirect("profile.php");
     }
 }
 ?>
@@ -211,32 +197,29 @@ footer {
         <div class="container">
             <h2>สมัครสมาชิก</h2>
             <div class="payment-info">
-                <h3>ค่าชำระ 3000 บาท</h3>
-                <p>การสมัครสมาชิกจะทำให้คุณเป็นสมาชิก 1 ปีจากวันที่ชำระเงิน</p>
-                
-                <img src="images/qrcode.png" alt="QR Code สำหรับการชำระเงิน">
-                <div class="total">ยอดรวม: 3000 บาท</div>
+                <h3>ค่าชำระ <?php echo number_format(MEMBER_FEE); ?> บาท</h3>
+                <p>การสมัครสมาชิกจะทำให้คุณเป็นสมาชิก 1 ปีนับจากวันที่ร้านอนุมัติ</p>
+                <p>สมาชิกเช่ากระเป๋าได้โดยไม่ต้องวางมัดจำ (ปกติ <?php echo number_format(DEPOSIT_FEE); ?> บาทต่อใบ)</p>
 
-                <p>สมาชิกจะได้รับสิทธิประโยชน์ต่างๆ ตลอด 1 ปี</p>
+                <?php if ($already_member): ?>
+                    <p style="color: green; font-weight: bold;">คุณเป็นสมาชิกอยู่แล้ว<?php echo $user['member_until'] ? ' (ถึง ' . e($user['member_until']) . ')' : ''; ?></p>
+                <?php elseif ($pending): ?>
+                    <p style="color: orange; font-weight: bold;">ส่งสลิปแล้ว รอร้านตรวจสอบและอนุมัติค่ะ</p>
+                <?php else: ?>
+                    <img src="images/qrcode.png" alt="QR Code สำหรับการชำระเงิน">
+                    <div class="total">ยอดรวม: <?php echo number_format(MEMBER_FEE); ?> บาท</div>
 
-                <form action="member.php" method="post" enctype="multipart/form-data">
-                    <input type="file" name="payment_slip" required><br><br>
-                    <button type="submit" class="upload-btn">อัปโหลดสลิปการชำระเงิน</button>
-                </form>
+                    <form action="member.php" method="post" enctype="multipart/form-data">
+                        <?php echo csrf_field(); ?>
+                        <p>แนบสลิปการโอน (JPG, PNG หรือ WEBP ไม่เกิน 2 MB)</p>
+                        <input type="file" name="payment_slip" accept="image/jpeg,image/png,image/webp" required><br><br>
+                        <button type="submit" class="upload-btn">ส่งสลิปเพื่อสมัครสมาชิก</button>
+                    </form>
 
-                <?php
-                if ($upload_message != '') {
-                    echo "<p style='color: green; font-weight: bold;'>$upload_message</p>";
-                }
-                ?>
-
-                <?php
-                if (isset($_SESSION['payment_slip_uploaded']) && $_SESSION['payment_slip_uploaded'] === true) {
-                    echo '<a href="confirm_payment.php" class="confirm-btn">ยืนยันการชำระเงิน</a>';
-                } else {
-                    echo '<a href="#" class="confirm-btn" style="pointer-events: none; opacity: 0.5;">ยืนยันการชำระเงิน</a>';
-                }
-                ?>
+                    <?php if ($upload_error !== ''): ?>
+                        <p style="color: red; font-weight: bold;"><?php echo e($upload_error); ?></p>
+                    <?php endif; ?>
+                <?php endif; ?>
 
                 <a href="profile.php" class="back-btn">ย้อนกลับ</a>
             </div>

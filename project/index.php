@@ -1,8 +1,7 @@
 <?php
-include 'db_connect.php';
-session_start();
+require_once 'db_connect.php';
 
-$search = isset($_GET['search']) ? $_GET['search'] : '';
+$search = isset($_GET['search']) && is_string($_GET['search']) ? trim($_GET['search']) : '';
 
 $sql = "SELECT * FROM products WHERE brand LIKE ? OR details LIKE ?";
 $stmt = $conn->prepare($sql);
@@ -93,11 +92,11 @@ $result = $stmt->get_result();
                 <?php if ($result->num_rows > 0): ?>
                     <?php while ($product = $result->fetch_assoc()): ?>
                         <div class="product-item">
-                            <img src="images/<?php echo $product['product_id']; ?>.png" alt="<?php echo $product['brand']; ?>">
-                            <h3><?php echo $product['brand']; ?></h3>
-                            <p><?php echo $product['details']; ?></p>
+                            <img src="images/<?php echo e($product['product_id']); ?>.png" alt="<?php echo e($product['brand']); ?>">
+                            <h3><?php echo e($product['brand']); ?></h3>
+                            <p><?php echo e($product['details']); ?></p>
                             <p><strong>ราคาเช่า:</strong> <?php echo number_format($product['daily_rental_price'], 2); ?> บาท / วัน</p>
-                            <a href="product_detail.php?product_id=<?php echo $product['product_id']; ?>" class="rent-btn">เช่าตอนนี้</a>
+                            <a href="product_detail.php?product_id=<?php echo urlencode($product['product_id']); ?>" class="rent-btn">เช่าตอนนี้</a>
                         </div>
                     <?php endwhile; ?>
                 <?php else: ?>

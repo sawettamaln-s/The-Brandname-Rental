@@ -1,51 +1,54 @@
 <?php
-include 'db_connect.php';
-session_start();
+require_once 'db_connect.php';
 
-if (!isset($_SESSION["customers_id"])) {
-    header("Location: login.php");
-    exit();
+$customer_id = require_customer();
+$customer = find_customer($conn, $customer_id);
+if (!$customer) {
+    die("ไม่พบข้อมูลลูกค้า");
 }
 
-$employee_stmt = $conn->prepare("SELECT employees_id FROM employees ORDER BY RAND() LIMIT 1");
-$employee_stmt->execute();
-$employee_result = $employee_stmt->get_result();
-$employee_stmt->close();
-
-$customer_id = $_SESSION["customers_id"];
-
-
-$stmt = $conn->prepare("SELECT customers_id, customers_firstname, customers_lastname, gender, customers_member,
-phonenumber, email, address, postal_code FROM customers WHERE customers_id = ?");
-$stmt->bind_param("s", $customer_id);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result->num_rows == 1) {
-    $customer = $result->fetch_assoc();
-} else {
-    echo "ไม่พบข้อมูลลูกค้า";
-    exit();
-}
-$stmt->close();
-
-$rental_stmt = $conn->prepare("SELECT rental_id, customers_id, product_id, employees_id, track_rentals,
-rental_date, rental_days, deposit_fee, rental_status FROM rentals WHERE customers_id = ?");
+$rental_stmt = $conn->prepare("SELECT r.rental_id, r.product_id, p.brand, r.employees_id, r.track_rentals,
+    r.rental_date, r.rental_days, r.deposit_fee, r.rental_status
+    FROM rentals r LEFT JOIN products p ON p.product_id = r.product_id
+    WHERE r.customers_id = ? ORDER BY r.rental_id DESC");
 $rental_stmt->bind_param("s", $customer_id);
 $rental_stmt->execute();
 $rental_result = $rental_stmt->get_result();
 $rental_stmt->close();
 
-$rental_stmt = $conn->prepare("
-    SELECT t.rental_id, t.track_return, t.returnl_status, rs.return_date, 
-    c.customers_firstname, c.customers_lastname
+$return_stmt = $conn->prepare("
+    SELECT t.rental_id, t.track_return, t.returnl_status, rs.return_date, r.deposit_fee
     FROM track_return t
     JOIN rentals r ON t.rental_id = r.rental_id
-    JOIN customers c ON r.customers_id = c.customers_id
-    LEFT JOIN returnss rs ON t.rental_id = rs.rental_id  -- เชื่อมกับ returnss
-    WHERE r.customers_id = ?
+    LEFT JOIN returnss rs ON t.rental_id = rs.rental_id
+    WHERE r.customers_id = ? ORDER BY t.rental_id DESC
 ");
+$return_stmt->bind_param("s", $customer_id);
+$return_stmt->execute();
+$return_result = $return_stmt->get_result();
+$return_stmt->close();
 
+// รายการที่ส่งคืนได้: ร้านยืนยันการเช่าแล้ว และยังไม่เคยแจ้งเลขพัสดุคืน
+$returnable_stmt = $conn->prepare("
+    SELECT r.rental_id, p.brand, p.details FROM rentals r
+    LEFT JOIN products p ON p.product_id = r.product_id
+    WHERE r.customers_id = ? AND r.rental_status = 'Complete'
+      AND NOT EXISTS (SELECT 1 FROM track_return t WHERE t.rental_id = r.rental_id)
+    ORDER BY r.rental_id
+");
+$returnable_stmt->bind_param("s", $customer_id);
+$returnable_stmt->execute();
+$returnable = $returnable_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$returnable_stmt->close();
 
+$request_stmt = $conn->prepare("SELECT status FROM membership_requests WHERE customers_id = ? ORDER BY request_id DESC LIMIT 1");
+$request_stmt->bind_param("s", $customer_id);
+$request_stmt->execute();
+$last_request = $request_stmt->get_result()->fetch_assoc();
+$request_stmt->close();
+$member_pending = !is_member($customer) && ($last_request['status'] ?? '') === 'Pending';
+
+$message = take_flash();
 ?>
 
 <!DOCTYPE html>
@@ -247,18 +250,31 @@ $rental_stmt = $conn->prepare("
 <main>
     <div class="container">
         <h2>โปรไฟล์ของฉัน</h2>
+        <?php if ($message): ?>
+            <p style="background: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 6px; font-weight: bold;"><?php echo e($message); ?></p>
+        <?php endif; ?>
         <div class="profile-box">
             <p><strong>ID:</strong> <?php echo htmlspecialchars($customer['customers_id']); ?></p>
             <p><strong>ชื่อ:</strong> <?php echo htmlspecialchars($customer['customers_firstname'] . " " . $customer['customers_lastname']); ?></p>
             <p><strong>เพศ:</strong> <?php echo htmlspecialchars($customer['gender']); ?></p>
-            <p><strong>ประเภทสมาชิก:</strong> <?php echo htmlspecialchars($customer['customers_member']); ?></p>
+            <p><strong>ประเภทสมาชิก:</strong>
+                <?php if (is_member($customer)): ?>
+                    สมาชิก<?php echo $customer['member_until'] ? ' (ถึง ' . e($customer['member_until']) . ')' : ''; ?>
+                <?php elseif ($member_pending): ?>
+                    ทั่วไป · คำขอสมัครสมาชิกรอร้านตรวจสอบ
+                <?php else: ?>
+                    ทั่วไป
+                <?php endif; ?>
+            </p>
             <p><strong>เบอร์โทร:</strong> <?php echo htmlspecialchars($customer['phonenumber']); ?></p>
             <p><strong>อีเมล:</strong> <?php echo htmlspecialchars($customer['email']); ?></p>
             <p><strong>ที่อยู่:</strong> <?php echo htmlspecialchars($customer['address']); ?></p>
             <p><strong>รหัสไปรษณีย์:</strong> <?php echo htmlspecialchars($customer['postal_code']); ?></p>
 
             <a href="edit_profile.php" class="btn btn-edit">แก้ไขข้อมูล</a>
-            <a href="member.php" class="btn btn-edit">สมัคร member</a>
+            <?php if (!is_member($customer) && !$member_pending): ?>
+                <a href="member.php" class="btn btn-edit">สมัคร member</a>
+            <?php endif; ?>
         </div>
 
         <div class="rental-status">
@@ -278,14 +294,14 @@ $rental_stmt = $conn->prepare("
             </tr>
             <?php while ($rental = $rental_result->fetch_assoc()): ?>
                 <tr>
-                    <td><?php echo $rental['rental_id']; ?></td>
-                    <td><?php echo $rental['customers_id']; ?></td>
-                    <td><?php echo $rental['product_id']; ?></td>
-                    <td><?php echo $rental['employees_id']; ?></td>
-                    <td><?php echo htmlspecialchars($rental['track_rentals']); ?></td>
-                    <td><?php echo htmlspecialchars($rental['rental_date']); ?></td>
-                    <td><?php echo htmlspecialchars($rental['rental_days']); ?> วัน</td>
-                    <td><?php echo htmlspecialchars($rental['deposit_fee']); ?></td>
+                    <td><?php echo e($rental['rental_id']); ?></td>
+                    <td><?php echo e($customer_id); ?></td>
+                    <td><?php echo e($rental['product_id'] . ' ' . $rental['brand']); ?></td>
+                    <td><?php echo e($rental['employees_id']); ?></td>
+                    <td><?php echo e($rental['track_rentals']); ?></td>
+                    <td><?php echo e($rental['rental_date']); ?></td>
+                    <td><?php echo e($rental['rental_days']); ?> วัน</td>
+                    <td><?php echo number_format((int) $rental['deposit_fee']); ?> บาท</td>
                     <td>
                         <?php
                         if ($rental['rental_status'] == 'Pending') {
@@ -307,47 +323,39 @@ $rental_stmt = $conn->prepare("
 
 <div class="rental-status">
     <h3>สถานะการคืน</h3>
-    <?php
-    if (isset($_SESSION["customers_id"])) {
-        $customer_id = $_SESSION["customers_id"];
-    }
-
-    $rental_stmt = $conn->prepare("
-    SELECT t.rental_id, t.track_return, t.returnl_status, rs.return_date, 
-    c.customers_firstname, c.customers_lastname
-    FROM track_return t
-    JOIN rentals r ON t.rental_id = r.rental_id
-    JOIN customers c ON r.customers_id = c.customers_id
-    LEFT JOIN returnss rs ON t.rental_id = rs.rental_id  -- เชื่อมกับ returnss
-    WHERE r.customers_id = ?
-");
-
-    $rental_stmt->bind_param("s", $customer_id);
-    $rental_stmt->execute();
-    $rental_result = $rental_stmt->get_result();
-    ?>
-
-    <?php if ($rental_result->num_rows > 0): ?>
+    <?php if ($return_result->num_rows > 0): ?>
         <table>
             <tr>
                 <th>รหัสการเช่า</th>
-                <th>สถานะการคืน</th>
-                <th>วันที่คืน</th>
-                <th>ค่ามัดจำ</th>
+                <th>เลขพัสดุที่ส่งคืน</th>
+                <th>วันที่แจ้งส่งคืน</th>
+                <th>สถานะ</th>
+                <th>มัดจำที่ได้คืน</th>
             </tr>
-            <?php while ($rental = $rental_result->fetch_assoc()): ?>
+            <?php while ($return = $return_result->fetch_assoc()): ?>
                 <tr>
-                    <td><?php echo $rental['rental_id']; ?></td>
-                    <td><?php echo htmlspecialchars($rental['track_return']); ?></td>
-                    <td><?php echo isset($rental['return_date']) ? $rental['return_date'] : '-'; ?></td>
+                    <td><?php echo e($return['rental_id']); ?></td>
+                    <td><?php echo e($return['track_return']); ?></td>
+                    <td><?php echo e($return['return_date'] ?? '-'); ?></td>
                     <td>
                         <?php
-                        if ($rental['returnl_status'] == 'Pending') {
-                            echo "<span style='color: orange;'>รอการยืนยัน</span>";
-                        } elseif ($rental['returnl_status'] == 'Complete') {
-                            echo "<span style='color: green;'>สำเร็จ</span>";
+                        if ($return['returnl_status'] == 'Pending') {
+                            echo "<span style='color: orange;'>รอร้านตรวจสภาพ</span>";
+                        } elseif ($return['returnl_status'] == 'Complete') {
+                            echo "<span style='color: green;'>สภาพดี</span>";
                         } else {
-                            echo "<span style='color: red;'>ถูกยกเลิก</span>";
+                            echo "<span style='color: red;'>ชำรุด</span>";
+                        }
+                        ?>
+                    </td>
+                    <td>
+                        <?php
+                        // สภาพดี คืนมัดจำครึ่งหนึ่ง, ชำรุด ร้านยึดมัดจำทั้งหมด
+                        if ($return['returnl_status'] == 'Pending') {
+                            echo '-';
+                        } else {
+                            $refund = $return['returnl_status'] == 'Complete' ? intdiv((int) $return['deposit_fee'], 2) : 0;
+                            echo number_format($refund) . ' บาท';
                         }
                         ?>
                     </td>
@@ -360,19 +368,25 @@ $rental_stmt = $conn->prepare("
 </div>
 
 <div class="form-container">
-    <h3>กรอกข้อมูลการคืนสินค้า</h3>
+    <h3>แจ้งส่งคืนสินค้า</h3>
+    <?php if (count($returnable) > 0): ?>
     <form action="process_return.php" method="POST">
-        <label for="rental_id">รหัสการเช่า:</label>
-        <input type="text" id="rental_id" name="rental_id" required><br>
+        <?php echo csrf_field(); ?>
+        <label for="rental_id">รายการเช่าที่จะคืน:</label>
+        <select id="rental_id" name="rental_id" required>
+            <?php foreach ($returnable as $item): ?>
+                <option value="<?php echo e($item['rental_id']); ?>"><?php echo e($item['rental_id'] . ' · ' . $item['brand'] . ' ' . $item['details']); ?></option>
+            <?php endforeach; ?>
+        </select><br>
 
-        <label for="track_return">รหัสส่งสินค้า:</label>
-        <input type="text" id="track_return" name="track_return" required><br>
-
-        <label for="track_return">วันที่คืน:</label>
-        <input type="text" id="return_date" name="return_date" required><br>
+        <label for="track_return">เลขพัสดุที่ส่งคืน:</label>
+        <input type="text" id="track_return" name="track_return" maxlength="50" pattern="[A-Za-z0-9&\-]{8,50}" title="ตัวอักษรภาษาอังกฤษหรือตัวเลข 8–50 ตัว" required><br>
 
         <button type="submit" class="btn btn-edit">บันทึกการคืนสินค้า</button>
     </form>
+    <?php else: ?>
+        <p>ยังไม่มีรายการที่ต้องส่งคืน (ส่งคืนได้เมื่อร้านยืนยันการเช่าแล้ว)</p>
+    <?php endif; ?>
 </div>
 
     <a href="index.php" class="btn btn-back">ย้อนกลับสู่หน้าหลัก</a>

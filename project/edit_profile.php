@@ -1,49 +1,51 @@
 <?php
-include 'db_connect.php';
-session_start();
+require_once 'db_connect.php';
 
-if (!isset($_SESSION["customers_id"])) {
-    header("Location: login.php");
-    exit();
-}
-
-$customer_id = $_SESSION["customers_id"];
-
-
-$stmt = $conn->prepare("SELECT customers_id, customers_firstname, customers_lastname, gender, customers_member,
-phonenumber, email, address, postal_code FROM customers WHERE customers_id = ?");
-$stmt->bind_param("s", $customer_id);
-$stmt->execute();
-$result = $stmt->get_result();
-
-if ($result->num_rows == 1) {
-    $user = $result->fetch_assoc();
-} else {
-    echo "ไม่พบข้อมูลผู้ใช้";
-    exit();
-}
-$stmt->close();
+$customer_id = require_customer();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $firstname = input('firstname');
+    $lastname = input('lastname');
+    $gender = input('gender');
+    $phonenumber = input('phonenumber');
+    $email = input('email');
+    $address = input('address');
+    $postal_code = input('postal_code');
 
-    $firstname = $_POST['firstname'];
-    $lastname = $_POST['lastname'];
-    $gender = $_POST['gender'];
-    $phonenumber = $_POST['phonenumber'];
-    $email = $_POST['email'];
-    $address = $_POST['address'];
-    $postal_code = $_POST['postal_code'];
+    $stmt = $conn->prepare("SELECT 1 FROM customers WHERE email = ? AND customers_id <> ?");
+    $stmt->bind_param("ss", $email, $customer_id);
+    $stmt->execute();
+    $email_taken = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
 
-    $update_stmt = $conn->prepare("UPDATE customers SET customers_firstname = ?, customers_lastname = ?,
-    gender = ?, phonenumber = ?, email = ?, address = ?, postal_code = ? WHERE customers_id = ?");
-    $update_stmt->bind_param("ssssssss", $firstname, $lastname, $gender, $phonenumber, $email, $address, $postal_code, $customer_id);
-
-    if ($update_stmt->execute()) {
-        $message = "ข้อมูลถูกอัพเดทเรียบร้อย";
+    if ($firstname === '' || $lastname === '' || $address === '') {
+        $message = "กรุณากรอกข้อมูลให้ครบ";
+    } elseif (!in_array($gender, ['Male', 'Female', 'Other'], true)) {
+        $message = "กรุณาเลือกเพศ";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $message = "รูปแบบอีเมลไม่ถูกต้อง";
+    } elseif ($email_taken) {
+        $message = "อีเมลนี้มีผู้ใช้อื่นใช้แล้ว";
+    } elseif (!preg_match('/^[0-9\-+ ]{9,15}$/', $phonenumber)) {
+        $message = "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง";
+    } elseif (!preg_match('/^[0-9]{5}$/', $postal_code)) {
+        $message = "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก";
     } else {
-        $message = "ไม่สามารถอัพเดทข้อมูลได้";
+        $update_stmt = $conn->prepare("UPDATE customers SET customers_firstname = ?, customers_lastname = ?,
+        gender = ?, phonenumber = ?, email = ?, address = ?, postal_code = ? WHERE customers_id = ?");
+        $update_stmt->bind_param("ssssssss", $firstname, $lastname, $gender, $phonenumber, $email, $address, $postal_code, $customer_id);
+        $update_stmt->execute();
+        $update_stmt->close();
+        $_SESSION["customers_name"] = $firstname . " " . $lastname;
+        $message = "ข้อมูลถูกอัพเดทเรียบร้อย";
     }
-    $update_stmt->close();
+}
+
+// โหลดข้อมูลหลังบันทึก เพื่อให้ฟอร์มแสดงค่าล่าสุด
+$user = find_customer($conn, $customer_id);
+if (!$user) {
+    die("ไม่พบข้อมูลผู้ใช้");
 }
 ?>
 
@@ -173,10 +175,11 @@ footer {
         <h2>แก้ไขข้อมูลโปรไฟล์</h2>
 
         <?php if (isset($message)): ?>
-            <div class="message"><?php echo $message; ?></div>
+            <div class="message"><?php echo e($message); ?></div>
         <?php endif; ?>
 
         <form action="edit_profile.php" method="POST">
+            <?php echo csrf_field(); ?>
             <div class="form-group">
                 <label for="firstname">ชื่อ</label>
                 <input type="text" id="firstname" name="firstname" value="<?php echo htmlspecialchars($user['customers_firstname']); ?>" required>
@@ -190,6 +193,7 @@ footer {
                 <select id="gender" name="gender" required>
                     <option value="Male" <?php echo ($user['gender'] == 'Male') ? 'selected' : ''; ?>>ชาย</option>
                     <option value="Female" <?php echo ($user['gender'] == 'Female') ? 'selected' : ''; ?>>หญิง</option>
+                    <option value="Other" <?php echo ($user['gender'] == 'Other') ? 'selected' : ''; ?>>อื่น ๆ</option>
                 </select>
             </div>
             <div class="form-group">

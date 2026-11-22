@@ -1,17 +1,26 @@
 <?php
-session_start();
+require_once 'db_connect.php';
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = $_POST['username'];
-    $password = $_POST['password'];
+$error = '';
 
-    if ($username === "admin" && $password === "admin123") {
-        $_SESSION["admin_logged_in"] = true;
-        header("Location: index_admin.php");
-        exit();
-    } else {
-        $error = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง!";
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    verify_csrf();
+    $username = input('username');
+    $password = input('password', false);
+
+    // บัญชีแอดมินเก็บในตาราง admins โดยรหัสผ่านเป็น hash
+    $stmt = $conn->prepare("SELECT admin_id, password FROM admins WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $admin = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($admin && password_verify($password, $admin['password'])) {
+        start_login_session();
+        $_SESSION["admin_id"] = $admin['admin_id'];
+        redirect("index_admin.php");
     }
+    $error = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
 }
 ?>
 
@@ -85,10 +94,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <h2>เข้าสู่ระบบผู้ดูแล</h2>
         
         <?php if (!empty($error)): ?>
-            <div class="error"> <?php echo $error; ?> </div>
+            <div class="error"> <?php echo e($error); ?> </div>
         <?php endif; ?>
-        
+
         <form method="POST">
+            <?php echo csrf_field(); ?>
             <div class="input-group">
                 <label for="username">ชื่อผู้ใช้:</label>
                 <input type="text" name="username" id="username" required>
