@@ -56,7 +56,10 @@ function page_end(): void
     ?>
 </main>
 <footer class="site-footer">
-    <div class="container">© <?php echo date('Y'); ?> <?php echo SHOP_NAME; ?> · โปรเจกต์วิชาฐานข้อมูล</div>
+    <div class="container">
+        © <?php echo date('Y'); ?> <?php echo SHOP_NAME; ?> · โปรเจกต์วิชาฐานข้อมูล
+        <div class="footer-note">ร้านสมมติเพื่อการศึกษา ไม่ได้เปิดให้เช่าจริง · ภาพและชื่อแบรนด์เป็นของเจ้าของลิขสิทธิ์ ใช้ประกอบการเรียนเท่านั้น</div>
+    </div>
 </footer>
 </body>
 </html>

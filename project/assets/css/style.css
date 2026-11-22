@@ -65,6 +65,7 @@ p { margin: 0 0 12px; }
 .nav-link.active { background: #fff; color: var(--primary); }
 
 .site-footer { background: var(--primary); color: rgba(255, 255, 255, 0.85); text-align: center; padding: 18px 0; font-size: 0.9rem; }
+.footer-note { font-size: 0.8rem; opacity: 0.75; margin-top: 4px; }
 
 /* ---------- การ์ด ---------- */
 .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
