@@ -47,6 +47,7 @@ function page_start(string $title, string $area = 'shop', string $active = ''): 
         </nav>
     </div>
 </header>
+<?php demo_banner($base); ?>
 <main class="container page">
     <?php
 }

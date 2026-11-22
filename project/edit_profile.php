@@ -1,9 +1,12 @@
 <?php
 require_once 'includes/db.php';
 
-$customer_id = require_customer();
+$current = current_customer($conn);
+$customer_id = $current['customers_id'];
 $genders = ['Male' => 'ชาย', 'Female' => 'หญิง', 'Other' => 'อื่น ๆ'];
 $error = '';
+// โหมดเดโม: บัญชีทดลองเปลี่ยนอีเมลไม่ได้ เพื่อให้คนต่อไปยังล็อกอินด้วยอีเมลบนแถบเดโมได้
+$email_locked = is_seed_account($customer_id);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -11,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lastname = input('lastname');
     $gender = input('gender');
     $phonenumber = input('phonenumber');
-    $email = input('email');
+    $email = $email_locked ? $current['email'] : input('email');
     $address = input('address');
     $postal_code = input('postal_code');
 
@@ -82,7 +85,12 @@ page_start('แก้ไขข้อมูลส่วนตัว', 'shop', 'pr
         </div>
         <div class="field full">
             <label for="email">อีเมล</label>
-            <input type="email" id="email" name="email" maxlength="100" value="<?php echo $value('email', 'email'); ?>" required>
+            <?php if ($email_locked): ?>
+                <input type="email" id="email" value="<?php echo e($user['email']); ?>" readonly>
+                <div class="hint">บัญชีทดลองในโหมดเดโมเปลี่ยนอีเมลไม่ได้</div>
+            <?php else: ?>
+                <input type="email" id="email" name="email" maxlength="100" value="<?php echo $value('email', 'email'); ?>" required>
+            <?php endif; ?>
         </div>
         <div class="field full">
             <label for="address">ที่อยู่</label>

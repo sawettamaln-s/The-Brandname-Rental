@@ -1,11 +1,8 @@
 <?php
 require_once 'includes/db.php';
 
-$customer_id = require_customer();
-$user = find_customer($conn, $customer_id);
-if (!$user) {
-    die("ไม่พบข้อมูลผู้ใช้");
-}
+$user = current_customer($conn);
+$customer_id = $user['customers_id'];
 
 function has_pending_request(mysqli $conn, string $customer_id): bool
 {

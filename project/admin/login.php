@@ -27,6 +27,7 @@ page_start('เข้าสู่ระบบผู้ดูแล', 'admin');
 ?>
 <div class="card auth-card">
     <h1>เข้าสู่ระบบผู้ดูแล</h1>
+    <?php render_alert(take_flash()); ?>
     <?php error_alert($error); ?>
     <form method="POST" class="form-grid">
         <?php echo csrf_field(); ?>

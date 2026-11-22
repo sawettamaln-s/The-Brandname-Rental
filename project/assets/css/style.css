@@ -170,3 +170,8 @@ p { margin: 0 0 12px; }
     .info-list { grid-template-columns: 1fr; gap: 2px; }
     .info-list dd { margin-bottom: 8px; }
 }
+
+/* ---------- แถบโหมดเดโม ---------- */
+.demo-bar { background: #fff6e5; color: #7a4b00; border-bottom: 1px solid #f3d9a4; font-size: 0.88rem; padding: 8px 0; }
+.demo-bar code { background: rgba(0, 0, 0, 0.06); padding: 1px 6px; border-radius: 4px; font-size: 0.85rem; }
+.demo-bar a { color: #7a4b00; font-weight: 600; white-space: nowrap; }

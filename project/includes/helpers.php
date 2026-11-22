@@ -118,6 +118,21 @@ function deposit_for(array $customer): int
     return is_member($customer) ? 0 : DEPOSIT_FEE;
 }
 
+/**
+ * ลูกค้าที่ล็อกอินอยู่ ถ้ายังไม่ล็อกอินหรือไม่พบบัญชีแล้ว (เช่น ข้อมูลเดโมถูกรีเซ็ต) จะออกจากระบบและไปหน้าเข้าสู่ระบบ
+ */
+function current_customer(mysqli $conn): array
+{
+    $customer = find_customer($conn, require_customer());
+    if (!$customer) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+        flash('ไม่พบบัญชีของคุณแล้ว กรุณาเข้าสู่ระบบใหม่', 'error');
+        redirect('login.php');
+    }
+    return $customer;
+}
+
 function find_customer(mysqli $conn, string $customer_id): ?array
 {
     $stmt = $conn->prepare('SELECT * FROM customers WHERE customers_id = ?');
@@ -218,6 +233,8 @@ function random_employee_id(mysqli $conn): ?string
  * ตรวจชนิดไฟล์จากเนื้อไฟล์จริง และตั้งชื่อไฟล์เอง (ไม่ใช้ชื่อที่ผู้ใช้ส่งมา) นามสกุลมาจากชนิดไฟล์ที่ตรวจได้
  * $name คือชื่อไฟล์ไม่รวมนามสกุล ถ้าไม่ระบุจะสุ่มให้
  * คืนค่า ['file' => ชื่อไฟล์] เมื่อสำเร็จ หรือ ['error' => ข้อความ] เมื่อไม่ผ่าน
+ * โหมดเดโม: ตรวจไฟล์ตามปกติแต่ไม่เก็บไฟล์ที่ส่งมา สลิปจะใช้รูปตัวอย่างแทน
+ * ส่วนรูปที่ตั้งชื่อเอง (รูปสินค้า) คืนค่า ['file' => null, 'demo' => true] ให้หน้านั้นใช้รูปตัวแทน
  */
 function save_image(?array $upload, string $dir, ?string $name = null): array
 {
@@ -234,8 +251,16 @@ function save_image(?array $upload, string $dir, ?string $name = null): array
         return ['error' => 'รองรับเฉพาะไฟล์รูป JPG, PNG หรือ WEBP'];
     }
 
+    if (demo_mode() && $name !== null) {
+        return ['file' => null, 'demo' => true];
+    }
+
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);
+    }
+    if (demo_mode()) {
+        $file = bin2hex(random_bytes(16)) . '.png';
+        return copy(DEMO_SLIP_SAMPLE, $dir . '/' . $file) ? ['file' => $file] : ['error' => 'บันทึกไฟล์ไม่สำเร็จ กรุณาลองใหม่'];
     }
     $file = ($name ?? bin2hex(random_bytes(16))) . '.' . $allowed[$mime];
     if (!move_uploaded_file($upload['tmp_name'], $dir . '/' . $file)) {

@@ -21,7 +21,15 @@ page_start('สินค้า', 'admin', 'products');
 ?>
 <div class="page-head">
     <h1>สินค้า</h1>
-    <a href="product_add.php" class="btn">+ เพิ่มสินค้า</a>
+    <div class="actions" style="margin: 0;">
+        <?php if (demo_mode()): ?>
+            <form action="demo_reset.php" method="POST" class="inline-form" onsubmit="return confirm('ล้างข้อมูลทั้งหมดกลับเป็นค่าตั้งต้นของเดโม?');">
+                <?php echo csrf_field(); ?>
+                <button type="submit" class="btn btn-outline">รีเซ็ตข้อมูลเดโม</button>
+            </form>
+        <?php endif; ?>
+        <a href="product_add.php" class="btn">+ เพิ่มสินค้า</a>
+    </div>
 </div>
 <?php render_alert(take_flash()); ?>
 

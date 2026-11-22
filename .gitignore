@@ -3,3 +3,4 @@ project/uploads/*
 .DS_Store
 Thumbs.db
 project/includes/config.local.php
+dist/

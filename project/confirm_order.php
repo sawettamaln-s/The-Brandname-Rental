@@ -1,16 +1,13 @@
 <?php
 require_once 'includes/db.php';
 
-$customer_id = require_customer();
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     redirect("checkout.php");
 }
 verify_csrf();
 
-$customer = find_customer($conn, $customer_id);
-if (!$customer) {
-    die("ไม่พบข้อมูลลูกค้า");
-}
+$customer = current_customer($conn);
+$customer_id = $customer['customers_id'];
 
 // ราคาและค่ามัดจำคำนวณใหม่จากฐานข้อมูล ไม่เชื่อค่าที่เก็บในตะกร้า
 $lines = cart_lines($conn, $customer);

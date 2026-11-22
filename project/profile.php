@@ -1,11 +1,8 @@
 <?php
 require_once 'includes/db.php';
 
-$customer_id = require_customer();
-$customer = find_customer($conn, $customer_id);
-if (!$customer) {
-    die("ไม่พบข้อมูลลูกค้า");
-}
+$customer = current_customer($conn);
+$customer_id = $customer['customers_id'];
 
 $rental_stmt = $conn->prepare("SELECT r.rental_id, r.product_id, p.brand, p.details, r.employees_id, r.track_rentals,
     r.rental_date, r.rental_days, r.deposit_fee, r.rental_status

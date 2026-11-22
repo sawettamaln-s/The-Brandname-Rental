@@ -19,6 +19,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         // สร้างรหัสตอนบันทึก เพื่อไม่ให้รหัสซ้ำเมื่อมีการเพิ่มสินค้าจากหลายหน้าพร้อมกัน
         $product_id = next_id($conn, 'products', 'product_id', 'PD', 4);
         $image = null;
+        $saved = [];
         if ($has_image) {
             // รูปตั้งชื่อตามรหัสสินค้า นามสกุลมาจากชนิดไฟล์ที่ตรวจได้
             $saved = save_image($_FILES['image'], PRODUCT_IMAGE_DIR, $product_id);
@@ -35,7 +36,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $stmt->bind_param("sssis", $product_id, $brand, $details, $daily_rental_price, $image);
                 $stmt->execute();
                 $stmt->close();
-                flash("เพิ่มสินค้า $product_id เรียบร้อยแล้ว");
+                $note = !empty($saved['demo']) ? ' (โหมดเดโมไม่เก็บรูปที่อัปโหลด จึงแสดงรูปตัวแทน)' : '';
+                flash("เพิ่มสินค้า $product_id เรียบร้อยแล้ว" . $note);
                 redirect("index.php");
             } catch (mysqli_sql_exception $e) {
                 if ($image) {
@@ -76,7 +78,7 @@ page_start('เพิ่มสินค้า', 'admin', 'products');
         <div class="field full">
             <label for="image">รูปสินค้า</label>
             <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp">
-            <div class="hint">JPG, PNG หรือ WEBP ไม่เกิน 2 MB (ไม่ใส่ก็ได้ จะแสดงรูปตัวแทน)</div>
+            <div class="hint">JPG, PNG หรือ WEBP ไม่เกิน 2 MB (ไม่ใส่ก็ได้ จะแสดงรูปตัวแทน)<?php echo demo_mode() ? ' · โหมดเดโมจะตรวจไฟล์แต่ไม่เก็บรูปจริง' : ''; ?></div>
         </div>
         <div class="full actions">
             <button type="submit" class="btn">เพิ่มสินค้า</button>
