@@ -1,6 +1,6 @@
 <?php
 // แสดงสลิปให้แอดมินดู โฟลเดอร์ uploads ถูกปิดไม่ให้เปิดผ่านเว็บโดยตรง
-require_once 'db_connect.php';
+require_once '../includes/db.php';
 require_admin();
 
 $request_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);

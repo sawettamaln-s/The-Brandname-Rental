@@ -1,5 +1,5 @@
 <?php
-require_once 'db_connect.php';
+require_once 'includes/db.php';
 
 $customer_id = require_customer();
 $customer = find_customer($conn, $customer_id);
@@ -12,52 +12,20 @@ if (count($lines) === 0) {
     redirect("cart.php");
 }
 $total = array_sum(array_column($lines, 'subtotal'));
+
+page_start('ชำระเงิน', 'shop', 'cart');
 ?>
-
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ยืนยันคำสั่งซื้อ - ระบบเช่า</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="checkout_styles.css">
-<style>
-        .back-btn {
-            display: block;
-            text-align: center;
-            margin: 20px auto;
-            padding: 12px;
-            background-color: #7f8c8d;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            width: 220px;
-            font-size: 16px;
-        }
-        .back-btn:hover {
-            background-color: #636e72;
-        }
-</style>
-</head>
-<body>
-    <header>
-        THE BRANDNAME RENTAL
-    </header>
-
-    <main>
-        <div class="container">
-            <div class="card payment-info">
-                <h2>สแกนเพื่อชำระเงิน</h2>
-                <img src="images/qrcode.png" alt="QR Code สำหรับการชำระเงิน">
-                <div class="total">ยอดรวม: <?php echo number_format($total, 2); ?> บาท</div>
-                <form action="confirm_order.php" method="POST">
-                    <?php echo csrf_field(); ?>
-                    <button type="submit" class="confirm-btn" style="border: none; cursor: pointer; font: inherit;">ยืนยันการชำระเงิน</button>
-                </form>
-            </div>
-        </div>
-    </main>
-    <a href="cart.php" class="back-btn">ย้อนกลับสู่หน้าหลัก</a>
-</body>
-</html>
+<div class="page-narrow">
+    <div class="card payment">
+        <h1>สแกนเพื่อชำระเงิน</h1>
+        <img src="assets/images/qrcode.png" alt="QR Code สำหรับการชำระเงิน">
+        <div class="total">ยอดรวม <?php echo baht($total); ?></div>
+        <p class="muted">ค่าเช่า <?php echo count($lines); ?> รายการ รวมค่ามัดจำ ร้านจะตรวจยอดโอนแล้วยืนยันคำสั่งเช่าให้</p>
+        <form action="confirm_order.php" method="POST" class="actions" style="justify-content: center;">
+            <?php echo csrf_field(); ?>
+            <a href="cart.php" class="btn btn-outline">กลับไปตะกร้า</a>
+            <button type="submit" class="btn btn-success">ยืนยันการชำระเงิน</button>
+        </form>
+    </div>
+</div>
+<?php page_end(); ?>

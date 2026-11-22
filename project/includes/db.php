@@ -1,5 +1,5 @@
 <?php
-// เชื่อมต่อฐานข้อมูลและโหลดฟังก์ชันส่วนกลาง ทุกหน้าที่ include ไฟล์นี้จะได้ $conn และเริ่ม session ให้
+// เชื่อมต่อฐานข้อมูลและโหลดฟังก์ชันส่วนกลาง ทุกหน้าที่ include ไฟล์นี้จะได้ $conn, session และฟังก์ชันส่วนหัว/ท้ายหน้า
 $config = require __DIR__ . '/config.php';
 
 // ให้ mysqli โยน exception เมื่อคำสั่ง SQL ผิดพลาด แทนการเงียบแล้วทำงานต่อ
@@ -15,3 +15,4 @@ try {
 }
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/layout.php';

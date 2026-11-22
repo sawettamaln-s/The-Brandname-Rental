@@ -1,0 +1,4 @@
+# โฟลเดอร์รูปสินค้า: ไม่ให้รันสคริปต์ใด ๆ แม้มีไฟล์หลุดเข้ามา
+<FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh)$">
+    Require all denied
+</FilesMatch>

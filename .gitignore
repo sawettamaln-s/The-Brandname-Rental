@@ -2,4 +2,4 @@ project/uploads/*
 !project/uploads/.htaccess
 .DS_Store
 Thumbs.db
-project/config.local.php
+project/includes/config.local.php

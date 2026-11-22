@@ -70,20 +70,21 @@ CREATE TABLE products (
     product_id         VARCHAR(50) PRIMARY KEY,
     brand              VARCHAR(50),
     details            VARCHAR(100),
-    daily_rental_price INT
+    daily_rental_price INT,
+    image              VARCHAR(100) NULL   -- ชื่อไฟล์รูปใน assets/images/products/ (ไม่มีรูปจะแสดงรูปตัวแทน)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO products (product_id, brand, details, daily_rental_price) VALUES
-('PD0001', 'Chanel',    '22 Bag Medium in Black',           4100),
-('PD0002', 'Chanel',    'Classic 10 Black Silver Hardwear', 3900),
-('PD0003', 'Celine',    'Ava Triomphe',                     2300),
-('PD0004', 'Celine',    'Pico Belt Bag',                    1900),
-('PD0005', 'DIOR',      'LADY D JOY SMALL',                 3300),
-('PD0006', 'Lady Dior', 'Medium Shiny Calf in Black',       2800),
-('PD0007', 'Goyard',    'Structure Mini Saigon in White',   3550),
-('PD0008', 'Hermes',    'Kelly 28Gris T GHW',               5200),
-('PD0009', 'Prada',     'Alma mini',                        1500),
-('PD0010', 'YSL',       'Medium College in CROC',           1900);
+INSERT INTO products (product_id, brand, details, daily_rental_price, image) VALUES
+('PD0001', 'Chanel',    '22 Bag Medium in Black',           4100, 'PD0001.png'),
+('PD0002', 'Chanel',    'Classic 10 Black Silver Hardwear', 3900, 'PD0002.png'),
+('PD0003', 'Celine',    'Ava Triomphe',                     2300, 'PD0003.png'),
+('PD0004', 'Celine',    'Pico Belt Bag',                    1900, 'PD0004.png'),
+('PD0005', 'DIOR',      'LADY D JOY SMALL',                 3300, 'PD0005.png'),
+('PD0006', 'Lady Dior', 'Medium Shiny Calf in Black',       2800, 'PD0006.png'),
+('PD0007', 'Goyard',    'Structure Mini Saigon in White',   3550, 'PD0007.png'),
+('PD0008', 'Hermes',    'Kelly 28Gris T GHW',               5200, 'PD0008.png'),
+('PD0009', 'Prada',     'Alma mini',                        1500, 'PD0009.png'),
+('PD0010', 'YSL',       'Medium College in CROC',           1900, 'PD0010.png');
 
 -- การเช่า: หนึ่งแถวต่อกระเป๋าหนึ่งใบ
 -- ค่ามัดจำ: สมาชิก 0 บาท, ไม่เป็นสมาชิก 900 บาทต่อใบ

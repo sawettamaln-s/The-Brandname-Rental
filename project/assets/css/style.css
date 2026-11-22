@@ -1,0 +1,171 @@
+/* ============================================================
+   สไตล์ของทั้งเว็บ (หน้าร้านและหลังบ้าน)
+   สีหลักและขนาดอยู่ที่ :root เปลี่ยนที่เดียวมีผลทั้งเว็บ
+   ============================================================ */
+:root {
+    --primary: #34495e;
+    --primary-dark: #2c3e50;
+    --primary-soft: #eaeef2;
+    --success: #27ae60;
+    --success-soft: #e8f6ee;
+    --danger: #e74c3c;
+    --danger-soft: #fdecea;
+    --warning: #e67e22;
+    --text: #2d3748;
+    --muted: #6b7785;
+    --border: #e2e6ea;
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --radius: 10px;
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    --font: 'Prompt', 'Segoe UI', Tahoma, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+img { max-width: 100%; display: block; }
+a { color: var(--primary); }
+h1, h2, h3 { color: var(--primary-dark); line-height: 1.3; margin: 0 0 16px; }
+h1 { font-size: 1.7rem; }
+h2 { font-size: 1.3rem; }
+h3 { font-size: 1.1rem; }
+p { margin: 0 0 12px; }
+.muted { color: var(--muted); }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+
+.container { width: min(1160px, 100% - 32px); margin-inline: auto; }
+.page { flex: 1; padding: 32px 0 48px; min-width: 0; }
+.page-narrow { max-width: 760px; margin-inline: auto; }
+.page-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.page-head h1 { margin: 0; }
+.stack > * + * { margin-top: 20px; }
+
+/* ---------- ส่วนหัวและเมนู ---------- */
+.site-header { background: var(--primary); color: #fff; }
+.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 0; }
+.brand { color: #fff; text-decoration: none; font-size: 1.35rem; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: 10px; }
+.brand-tag { font-size: 0.7rem; background: rgba(255, 255, 255, 0.18); padding: 2px 8px; border-radius: 999px; }
+.nav { display: flex; flex-wrap: wrap; gap: 6px; }
+.nav-form { margin: 0; }
+.nav-link {
+    color: #fff; text-decoration: none; font: inherit; font-size: 0.95rem;
+    padding: 7px 14px; border-radius: 999px; border: 0; background: transparent; cursor: pointer;
+}
+.nav-link:hover { background: rgba(255, 255, 255, 0.12); }
+.nav-link.active { background: #fff; color: var(--primary); }
+
+.site-footer { background: var(--primary); color: rgba(255, 255, 255, 0.85); text-align: center; padding: 18px 0; font-size: 0.9rem; }
+
+/* ---------- การ์ด ---------- */
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
+.card > :last-child { margin-bottom: 0; }
+
+/* ---------- ปุ่ม ---------- */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 20px; border-radius: 8px; border: 1px solid transparent;
+    font: inherit; font-size: 0.95rem; font-weight: 500; text-decoration: none; cursor: pointer;
+    background: var(--primary); color: #fff; transition: background 0.2s, transform 0.1s;
+}
+.btn:hover { background: var(--primary-dark); }
+.btn:active { transform: translateY(1px); }
+.btn-success { background: var(--success); }
+.btn-success:hover { background: #1e8e4f; }
+.btn-danger { background: var(--danger); }
+.btn-danger:hover { background: #c0392b; }
+.btn-outline { background: transparent; color: var(--primary); border-color: var(--primary); }
+.btn-outline:hover { background: var(--primary-soft); }
+.btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+.btn-block { width: 100%; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 20px; }
+.inline-form { display: inline; margin: 0; }
+
+/* ---------- ฟอร์ม ---------- */
+.form-grid { display: grid; gap: 16px; }
+.form-grid.two-cols { grid-template-columns: repeat(2, 1fr); }
+.field label, .field-label { display: block; font-weight: 500; margin-bottom: 6px; color: var(--primary-dark); }
+.field input, .field select, .field textarea {
+    width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
+    border: 1px solid #cfd6dd; border-radius: 8px; background: #fff;
+}
+.field input:focus, .field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(52, 73, 94, 0.15); }
+.field input[readonly], .field input:disabled { background: var(--bg); color: var(--muted); }
+.field .hint { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+.radio-row { display: flex; gap: 18px; flex-wrap: wrap; }
+.radio-row label { display: flex; align-items: center; gap: 6px; font-weight: 400; white-space: nowrap; }
+.radio-row input { width: auto; margin: 0; }
+.full { grid-column: 1 / -1; }
+
+/* ---------- ตาราง ---------- */
+.table-wrap { overflow-x: auto; max-width: 100%; }
+.table-wrap .table { min-width: 640px; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.table th { background: var(--primary); color: #fff; font-weight: 500; text-align: left; padding: 12px; white-space: nowrap; }
+.table td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.table tr:hover td { background: #fafbfc; }
+.table .num { text-align: right; white-space: nowrap; }
+.table tfoot td { font-weight: 600; background: var(--primary-soft); }
+
+/* ---------- ข้อความแจ้งเตือนและสถานะ ---------- */
+.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; }
+.alert-success { background: var(--success-soft); color: #1e7a46; }
+.alert-error { background: var(--danger-soft); color: #b03a2e; }
+.alert-info { background: var(--primary-soft); color: var(--primary-dark); }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 500; white-space: nowrap; }
+.badge-pending { background: #fdf2e6; color: var(--warning); }
+.badge-success { background: var(--success-soft); color: var(--success); }
+.badge-danger { background: var(--danger-soft); color: var(--danger); }
+
+/* ---------- รายการข้อมูล (ชื่อ: ค่า) ---------- */
+.info-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; }
+.info-list dt { font-weight: 500; color: var(--muted); }
+.info-list dd { margin: 0; }
+
+/* ---------- หน้าร้าน: ค้นหาและรายการสินค้า ---------- */
+.search { display: flex; max-width: 440px; margin: 0 auto 28px; }
+.search input { flex: 1; padding: 12px 18px; font: inherit; border: 2px solid var(--primary); border-right: 0; border-radius: 999px 0 0 999px; outline: none; }
+.search button { padding: 12px 24px; font: inherit; border: 0; border-radius: 0 999px 999px 0; background: var(--primary); color: #fff; cursor: pointer; }
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+.product-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; text-align: center; display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s; }
+.product-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1); }
+.product-card img { height: 220px; width: 100%; object-fit: contain; margin-bottom: 14px; }
+.product-card h3 { margin: 0 0 4px; }
+.product-card .details { color: var(--muted); font-size: 0.95rem; }
+.product-card .price { font-weight: 600; color: var(--primary-dark); margin-top: auto; }
+.product-card .btn { margin-top: 8px; align-self: center; }
+.product-meta { font-size: 0.8rem; color: var(--muted); }
+
+.product-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+.product-detail .photo { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+.product-detail .photo img { width: 100%; max-height: 420px; object-fit: contain; }
+.product-detail .price { font-size: 1.3rem; font-weight: 600; color: var(--primary-dark); }
+
+/* ---------- ชำระเงิน ---------- */
+.payment { text-align: center; }
+.payment img { width: 240px; margin: 0 auto 16px; border-radius: 8px; }
+.payment .total { font-size: 1.4rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 16px; }
+
+/* ---------- หน้าเข้าสู่ระบบ/สมัครสมาชิก ---------- */
+.auth-card { max-width: 440px; margin: 24px auto; }
+.auth-card.wide { max-width: 600px; }
+.auth-card h1 { text-align: center; }
+.auth-switch { text-align: center; margin-top: 16px; }
+
+/* ---------- จอเล็ก ---------- */
+@media (max-width: 720px) {
+    .product-detail, .form-grid.two-cols { grid-template-columns: 1fr; }
+    .header-inner { justify-content: center; }
+    .card { padding: 18px; }
+    .info-list { grid-template-columns: 1fr; gap: 2px; }
+    .info-list dd { margin-bottom: 8px; }
+}

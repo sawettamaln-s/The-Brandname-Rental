@@ -1,5 +1,5 @@
 <?php
-require_once 'db_connect.php';
+require_once '../includes/db.php';
 require_admin();
 
 // อนุมัติ: ลูกค้าเป็นสมาชิก 1 ปีนับจากวันนี้, ปฏิเสธ: ลูกค้าส่งสลิปใหม่ได้
@@ -20,8 +20,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             if (!$request) {
                 $conn->rollback();
-                flash("คำขอนี้ถูกตรวจไปแล้ว");
-                redirect("admin_members.php");
+                flash("คำขอนี้ถูกตรวจไปแล้ว", "error");
+                redirect("members.php");
             }
 
             $status = $approve ? 'Approved' : 'Rejected';
@@ -42,80 +42,60 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             flash($approve ? "อนุมัติสมาชิก {$request['customers_id']} ถึง $until แล้ว" : "ปฏิเสธคำขอของ {$request['customers_id']} แล้ว");
         } catch (mysqli_sql_exception $e) {
             $conn->rollback();
-            error_log('admin_members failed: ' . $e->getMessage());
-            flash("บันทึกไม่สำเร็จ กรุณาลองใหม่");
+            error_log('admin members failed: ' . $e->getMessage());
+            flash("บันทึกไม่สำเร็จ กรุณาลองใหม่", "error");
         }
     }
-    redirect("admin_members.php");
+    redirect("members.php");
 }
 
-$result = $conn->query("SELECT m.request_id, m.customers_id, m.created_at, c.customers_firstname, c.customers_lastname, c.email
+$requests = $conn->query("SELECT m.request_id, m.customers_id, m.created_at, c.customers_firstname, c.customers_lastname, c.email
     FROM membership_requests m JOIN customers c ON c.customers_id = m.customers_id
-    WHERE m.status = 'Pending' ORDER BY m.created_at");
+    WHERE m.status = 'Pending' ORDER BY m.created_at")->fetch_all(MYSQLI_ASSOC);
 
-$message = take_flash();
+page_start('อนุมัติสมาชิก', 'admin', 'members');
 ?>
+<h1>คำขอสมัครสมาชิก</h1>
+<p class="muted">เปิดดูสลิปและตรวจยอดโอน <?php echo number_format(MEMBER_FEE); ?> บาท ก่อนกดอนุมัติ สมาชิกมีอายุ 1 ปีนับจากวันที่อนุมัติ</p>
+<?php render_alert(take_flash()); ?>
 
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>อนุมัติสมาชิก</title>
-    <link rel="stylesheet" href="admin_styles.css">
-</head>
-<body>
-
-<header>
-    <h1>THE BRANDNAME RENTAL - ADMIN</h1>
-</header>
-
-<main>
-    <div class="container">
-        <h2>อนุมัติสมาชิก</h2>
-        <p>เปิดดูสลิปและตรวจยอดโอน <?php echo number_format(MEMBER_FEE); ?> บาท ก่อนกดอนุมัติ สมาชิกมีอายุ 1 ปีนับจากวันที่อนุมัติ</p>
-
-        <?php if ($message): ?>
-            <div class="alert"><?php echo e($message); ?></div>
-        <?php endif; ?>
-
-        <?php if ($result->num_rows > 0): ?>
-            <table>
+<div class="card table-wrap">
+    <?php if ($requests): ?>
+        <table class="table">
+            <thead>
                 <tr>
                     <th>วันที่ส่ง</th>
                     <th>ลูกค้า</th>
                     <th>อีเมล</th>
                     <th>สลิป</th>
-                    <th>จัดการ</th>
+                    <th></th>
                 </tr>
-                <?php while ($row = $result->fetch_assoc()): ?>
+            </thead>
+            <tbody>
+                <?php foreach ($requests as $row): ?>
                     <tr>
                         <td><?php echo e($row['created_at']); ?></td>
                         <td><?php echo e($row['customers_id'] . ' ' . $row['customers_firstname'] . ' ' . $row['customers_lastname']); ?></td>
                         <td><?php echo e($row['email']); ?></td>
-                        <td><a href="admin_slip.php?id=<?php echo (int) $row['request_id']; ?>" target="_blank" rel="noopener">เปิดดูสลิป</a></td>
-                        <td>
-                            <form method="POST" style="display: inline;">
+                        <td><a href="slip.php?id=<?php echo (int) $row['request_id']; ?>" target="_blank" rel="noopener">เปิดดูสลิป</a></td>
+                        <td class="text-right" style="white-space: nowrap;">
+                            <form method="POST" class="inline-form">
                                 <?php echo csrf_field(); ?>
                                 <input type="hidden" name="request_id" value="<?php echo (int) $row['request_id']; ?>">
-                                <button type="submit" name="approve" class="btn btn-confirm">อนุมัติ</button>
+                                <button type="submit" name="approve" class="btn btn-success btn-sm">อนุมัติ</button>
                             </form>
-                            <form method="POST" style="display: inline;" onsubmit="return confirm('ปฏิเสธคำขอนี้?');">
+                            <form method="POST" class="inline-form" onsubmit="return confirm('ปฏิเสธคำขอนี้?');">
                                 <?php echo csrf_field(); ?>
                                 <input type="hidden" name="request_id" value="<?php echo (int) $row['request_id']; ?>">
-                                <button type="submit" name="reject" class="btn btn-cancel">ปฏิเสธ</button>
+                                <button type="submit" name="reject" class="btn btn-danger btn-sm">ปฏิเสธ</button>
                             </form>
                         </td>
                     </tr>
-                <?php endwhile; ?>
-            </table>
-        <?php else: ?>
-            <p>ไม่มีคำขอสมัครสมาชิกที่รอตรวจ</p>
-        <?php endif; ?>
-
-        <a href="index_admin.php" class="btn btn-back">กลับหน้าแรก</a>
-    </div>
-</main>
-
-</body>
-</html>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php else: ?>
+        <p class="muted">ไม่มีคำขอสมัครสมาชิกที่รอตรวจ</p>
+    <?php endif; ?>
+</div>
+<?php page_end(); ?>

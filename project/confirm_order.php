@@ -1,5 +1,5 @@
 <?php
-require_once 'db_connect.php';
+require_once 'includes/db.php';
 
 $customer_id = require_customer();
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
@@ -37,7 +37,7 @@ try {
 } catch (mysqli_sql_exception $e) {
     $conn->rollback();
     error_log('confirm_order failed: ' . $e->getMessage());
-    flash("บันทึกคำสั่งเช่าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    flash("บันทึกคำสั่งเช่าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง", "error");
     redirect("cart.php");
 }
 

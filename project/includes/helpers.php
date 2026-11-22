@@ -1,11 +1,13 @@
 <?php
-// ฟังก์ชันส่วนกลาง: session, การแสดงข้อความอย่างปลอดภัย, CSRF, การตรวจสิทธิ์, ค่ามัดจำ, การสร้างรหัส และการอัปโหลดสลิป
+// ฟังก์ชันส่วนกลาง: session, การแสดงข้อความอย่างปลอดภัย, CSRF, การตรวจสิทธิ์, ค่ามัดจำ, การสร้างรหัส และการอัปโหลดรูป
 
 const DEPOSIT_FEE = 900;        // ค่ามัดจำต่อกระเป๋าหนึ่งใบสำหรับผู้ที่ไม่เป็นสมาชิก
 const MEMBER_FEE = 3000;        // ค่าสมัครสมาชิก 1 ปี
 const MAX_RENTAL_DAYS = 30;     // จำนวนวันเช่าสูงสุดต่อรายการ
-const SLIP_MAX_BYTES = 2 * 1024 * 1024;
-const SLIP_DIR = __DIR__ . '/uploads/slips';
+const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const APP_ROOT = __DIR__ . '/..';
+const SLIP_DIR = APP_ROOT . '/uploads/slips';
+const PRODUCT_IMAGE_DIR = APP_ROOT . '/assets/images/products';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax']);
@@ -34,6 +36,11 @@ function redirect(string $url): void
     exit();
 }
 
+function baht($amount): string
+{
+    return number_format((float) $amount, 2) . ' บาท';
+}
+
 // ---------- CSRF: ทุกฟอร์ม POST ต้องส่ง token นี้มาด้วย ----------
 function csrf_token(): string
 {
@@ -58,6 +65,7 @@ function verify_csrf(): void
 }
 
 // ---------- การตรวจสิทธิ์ ----------
+// หน้าลูกค้าอยู่ที่โฟลเดอร์หลัก หน้าแอดมินอยู่ใน admin/ จึง redirect ไปหน้าเข้าสู่ระบบของโฟลเดอร์ตัวเอง
 function require_customer(): string
 {
     if (empty($_SESSION['customers_id'])) {
@@ -69,7 +77,7 @@ function require_customer(): string
 function require_admin(): void
 {
     if (empty($_SESSION['admin_id'])) {
-        redirect('admin_login.php');
+        redirect('login.php');
     }
 }
 
@@ -81,15 +89,16 @@ function start_login_session(): void
 }
 
 // ---------- ข้อความแจ้งผลครั้งเดียว ----------
-function flash(string $message): void
+function flash(string $message, string $type = 'success'): void
 {
-    $_SESSION['message'] = $message;
+    $_SESSION['flash'] = ['text' => $message, 'type' => $type];
 }
 
-function take_flash(): ?string
+/** คืนค่า ['text' => ..., 'type' => success|error] หรือ null */
+function take_flash(): ?array
 {
-    $message = $_SESSION['message'] ?? null;
-    unset($_SESSION['message']);
+    $message = $_SESSION['flash'] ?? null;
+    unset($_SESSION['flash']);
     return $message;
 }
 
@@ -119,6 +128,17 @@ function find_customer(mysqli $conn, string $customer_id): ?array
     return $row ?: null;
 }
 
+// ---------- สินค้า ----------
+/** URL รูปสินค้า (เทียบจากโฟลเดอร์ของหน้าที่เรียก) ถ้าไม่มีรูปจะได้รูปตัวแทน */
+function product_image_url(array $product, string $base = ''): string
+{
+    $file = basename((string) ($product['image'] ?? ''));
+    if ($file !== '' && is_file(PRODUCT_IMAGE_DIR . '/' . $file)) {
+        return $base . 'assets/images/products/' . rawurlencode($file);
+    }
+    return $base . 'assets/images/no-image.svg';
+}
+
 // ---------- ตะกร้า ----------
 /**
  * รายการในตะกร้าพร้อมข้อมูลสินค้าและราคาปัจจุบันจากฐานข้อมูล
@@ -128,7 +148,7 @@ function cart_lines(mysqli $conn, array $customer): array
 {
     $lines = [];
     $deposit = deposit_for($customer);
-    $stmt = $conn->prepare('SELECT product_id, brand, details, daily_rental_price FROM products WHERE product_id = ?');
+    $stmt = $conn->prepare('SELECT product_id, brand, details, daily_rental_price, image FROM products WHERE product_id = ?');
     foreach ($_SESSION['cart'] ?? [] as $item) {
         if (!isset($item['product_id'], $item['days'], $item['rental_date'])) {
             continue;
@@ -150,6 +170,11 @@ function cart_lines(mysqli $conn, array $customer): array
     }
     $stmt->close();
     return $lines;
+}
+
+function cart_count(): int
+{
+    return count($_SESSION['cart'] ?? []);
 }
 
 // ---------- การสร้างรหัส ----------
@@ -187,19 +212,20 @@ function random_employee_id(mysqli $conn): ?string
     return $row['employees_id'] ?? null;
 }
 
-// ---------- อัปโหลดสลิป ----------
+// ---------- อัปโหลดรูป ----------
 /**
- * ตรวจและบันทึกสลิปที่อัปโหลด รับเฉพาะรูป JPG/PNG/WEBP ไม่เกิน 2 MB
- * ตั้งชื่อไฟล์ใหม่แบบสุ่ม (ไม่ใช้ชื่อที่ผู้ใช้ส่งมา) และตรวจชนิดไฟล์จากเนื้อไฟล์จริง
+ * ตรวจและบันทึกรูปที่อัปโหลด รับเฉพาะ JPG/PNG/WEBP ไม่เกิน 2 MB
+ * ตรวจชนิดไฟล์จากเนื้อไฟล์จริง และตั้งชื่อไฟล์เอง (ไม่ใช้ชื่อที่ผู้ใช้ส่งมา) นามสกุลมาจากชนิดไฟล์ที่ตรวจได้
+ * $name คือชื่อไฟล์ไม่รวมนามสกุล ถ้าไม่ระบุจะสุ่มให้
  * คืนค่า ['file' => ชื่อไฟล์] เมื่อสำเร็จ หรือ ['error' => ข้อความ] เมื่อไม่ผ่าน
  */
-function save_slip(?array $upload): array
+function save_image(?array $upload, string $dir, ?string $name = null): array
 {
-    if (!$upload || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        return ['error' => 'กรุณาเลือกไฟล์สลิปก่อนอัปโหลด'];
+    if (!$upload || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        return ['error' => 'กรุณาเลือกไฟล์รูป'];
     }
-    if ($upload['size'] > SLIP_MAX_BYTES) {
-        return ['error' => 'ไฟล์ใหญ่เกิน 2 MB'];
+    if ($upload['error'] !== UPLOAD_ERR_OK || $upload['size'] > IMAGE_MAX_BYTES) {
+        return ['error' => 'ไฟล์ใหญ่เกิน 2 MB หรืออัปโหลดไม่สำเร็จ'];
     }
 
     $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
@@ -208,12 +234,12 @@ function save_slip(?array $upload): array
         return ['error' => 'รองรับเฉพาะไฟล์รูป JPG, PNG หรือ WEBP'];
     }
 
-    if (!is_dir(SLIP_DIR)) {
-        mkdir(SLIP_DIR, 0755, true);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
     }
-    $name = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
-    if (!move_uploaded_file($upload['tmp_name'], SLIP_DIR . '/' . $name)) {
+    $file = ($name ?? bin2hex(random_bytes(16))) . '.' . $allowed[$mime];
+    if (!move_uploaded_file($upload['tmp_name'], $dir . '/' . $file)) {
         return ['error' => 'บันทึกไฟล์ไม่สำเร็จ กรุณาลองใหม่'];
     }
-    return ['file' => $name];
+    return ['file' => $file];
 }
