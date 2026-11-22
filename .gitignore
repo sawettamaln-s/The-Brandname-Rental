@@ -4,3 +4,6 @@ project/uploads/*
 Thumbs.db
 project/includes/config.local.php
 dist/
+
+# โค้ด Python ของสมาชิกกลุ่ม (งานที่ส่งในวิชา) เก็บไว้ในเครื่องเท่านั้น ไม่เผยแพร่
+python/
