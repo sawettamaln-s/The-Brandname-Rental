@@ -38,7 +38,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $stmt->close();
                 $note = !empty($saved['demo']) ? ' (โหมดเดโมไม่เก็บรูปที่อัปโหลด จึงแสดงรูปตัวแทน)' : '';
                 flash("เพิ่มสินค้า $product_id เรียบร้อยแล้ว" . $note);
-                redirect("index.php");
+                redirect("products.php");
             } catch (mysqli_sql_exception $e) {
                 if ($image) {
                     @unlink(PRODUCT_IMAGE_DIR . '/' . $image);
@@ -82,7 +82,7 @@ page_start('เพิ่มสินค้า', 'admin', 'products');
         </div>
         <div class="full actions">
             <button type="submit" class="btn">เพิ่มสินค้า</button>
-            <a href="index.php" class="btn btn-outline">ยกเลิก</a>
+            <a href="products.php" class="btn btn-outline">ยกเลิก</a>
         </div>
     </form>
 </div>

@@ -20,8 +20,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $stmt->close();
 
             if ($changed > 0) {
-                $stmt = $conn->prepare("UPDATE orders SET reviewed_at = NOW() WHERE order_id = ?");
-                $stmt->bind_param("s", $order_id);
+                $cancelled_by = $action === 'reject' ? 'shop' : null;
+                $stmt = $conn->prepare("UPDATE orders SET reviewed_at = NOW(), cancelled_by = ? WHERE order_id = ?");
+                $stmt->bind_param("ss", $cancelled_by, $order_id);
                 $stmt->execute();
                 $stmt->close();
             }
@@ -29,7 +30,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             if ($changed > 0) {
                 flash($action === 'approve' ? "อนุมัติคำสั่ง $order_id แล้ว สถานะเป็นรับเรื่องแล้ว" : "ปฏิเสธคำสั่ง $order_id แล้ว กระเป๋ากลับมาว่าง");
             } else {
-                flash("คำสั่งนี้ถูกตรวจไปแล้ว", "error");
+                flash("คำสั่งนี้ถูกตรวจไปแล้ว หรือลูกค้ายกเลิกไปแล้ว", "error");
             }
         } catch (mysqli_sql_exception $e) {
             $conn->rollback();
@@ -123,7 +124,7 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
                 <div class="order-head">
                     <div>
                         <h3><?php echo e($order_id); ?> · <?php echo e($customer_name($first)); ?></h3>
-                        <div class="hint">สั่งเมื่อ <?php echo e($first['created_at']); ?></div>
+                        <div class="hint">สั่งเมื่อ <?php echo e(thai_date($first['created_at'])); ?></div>
                     </div>
                     <div class="text-right">
                         <div>ยอดที่ต้องได้รับ <strong><?php echo baht($order_total); ?></strong></div>
@@ -151,8 +152,8 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
                                 <tr>
                                     <td><?php echo e($item['rental_id']); ?></td>
                                     <td><?php echo e($item['product_id'] . ' ' . $item['brand']); ?></td>
-                                    <td><?php echo e($item['rental_date']); ?></td>
-                                    <td><?php echo e($item['due_date']); ?></td>
+                                    <td><?php echo e(thai_date($item['rental_date'])); ?></td>
+                                    <td><?php echo e(thai_date($item['due_date'])); ?></td>
                                     <td class="num"><?php echo number_format($item['daily_price'] * $item['rental_days']); ?><div class="hint"><?php echo number_format($item['daily_price']); ?> × <?php echo e($item['rental_days']); ?> วัน</div></td>
                                     <td class="num"><?php echo number_format($item['deposit_fee']); ?></td>
                                 </tr>
@@ -197,7 +198,7 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
                             <tr>
                                 <td><?php echo e($row['rental_id']); ?><div class="hint"><?php echo e($row['order_id']); ?></div></td>
                                 <td><?php echo e($row['product_id'] . ' ' . $row['brand']); ?></td>
-                                <td><?php echo e($row['rental_date']); ?></td>
+                                <td><?php echo e(thai_date($row['rental_date'])); ?></td>
                                 <td><?php echo e($customer_name($row)); ?><div class="hint"><?php echo e($row['address'] . ' ' . $row['postal_code'] . ' · ' . $row['phonenumber']); ?></div></td>
                                 <td>
                                     <?php echo status_badge($row); ?>
@@ -262,8 +263,8 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
                                 <td><?php echo e($row['rental_id']); ?></td>
                                 <td><?php echo e($customer_name($row)); ?><div class="hint"><?php echo e($row['phonenumber']); ?></div></td>
                                 <td><?php echo e($row['product_id'] . ' ' . $row['brand']); ?></td>
-                                <td><?php echo e($row['track_rentals']); ?><div class="hint">ส่งเมื่อ <?php echo e($row['shipped_date']); ?> โดย <?php echo e($row['employees_id'] . ' ' . $row['employees_firstname']); ?></div></td>
-                                <td><?php echo e($row['due_date']); ?></td>
+                                <td><?php echo e($row['track_rentals']); ?><div class="hint">ส่งเมื่อ <?php echo e(thai_date($row['shipped_date'])); ?> โดย <?php echo e($row['employees_id'] . ' ' . $row['employees_firstname']); ?></div></td>
+                                <td><?php echo e(thai_date($row['due_date'])); ?></td>
                                 <td><?php echo status_badge($row); ?></td>
                             </tr>
                         <?php endforeach; ?>

@@ -50,9 +50,9 @@ page_start('ตะกร้าสินค้า', 'shop', 'cart');
                                 <?php echo e($line['brand'] . ' ' . $line['details']); ?>
                                 <?php if ($problem): ?><div class="problem"><?php echo e($problem); ?></div><?php endif; ?>
                             </td>
-                            <td><?php echo e($line['rental_date']); ?></td>
+                            <td><?php echo e(thai_date($line['rental_date'])); ?></td>
                             <td class="num"><?php echo $line['days']; ?></td>
-                            <td><?php echo e($line['due_date']); ?></td>
+                            <td><?php echo e(thai_date($line['due_date'])); ?></td>
                             <td class="num"><?php echo baht($line['daily_rental_price']); ?></td>
                             <td class="num"><?php echo baht($line['rent']); ?></td>
                             <td class="num"><?php echo baht($line['deposit']); ?></td>

@@ -2,17 +2,10 @@
 require_once '../includes/db.php';
 require_admin();
 
-$search = isset($_GET['search']) && is_string($_GET['search']) ? trim($_GET['search']) : '';
+// ภาพรวมของร้าน: งานที่ต้องทำ ตัวเลขสำคัญ และรายการที่ต้องรีบดูใน 3 วันข้างหน้า
+const SOON_DAYS = 3;
 
-$stmt = $conn->prepare("SELECT * FROM products WHERE brand LIKE ? OR details LIKE ? ORDER BY product_id");
-$searchTerm = '%' . $search . '%';
-$stmt->bind_param('ss', $searchTerm, $searchTerm);
-$stmt->execute();
-$products = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-// ตัวเลขงานที่รอทำ แสดงบนหน้าแรกของแอดมิน
-$pending = $conn->query("SELECT
+$todo = $conn->query("SELECT
     (SELECT COUNT(DISTINCT order_id) FROM rentals WHERE rental_status = 'Pending') AS orders,
     (SELECT COUNT(*) FROM rentals WHERE rental_status IN ('Accepted', 'Preparing')) AS to_ship,
     (SELECT COUNT(*) FROM rentals WHERE rental_status = 'Shipped' AND due_date < CURDATE()) AS overdue,
@@ -20,52 +13,116 @@ $pending = $conn->query("SELECT
     (SELECT COUNT(*) FROM rentals WHERE rental_status = 'Received') AS inspect,
     (SELECT COUNT(*) FROM membership_requests WHERE status = 'Pending') AS members")->fetch_assoc();
 
-page_start('สินค้า', 'admin', 'products');
+// ค่าเช่าเดือนนี้นับการเช่าที่ร้านรับเรื่องแล้วและเริ่มเช่าในเดือนนี้ มัดจำที่ถืออยู่คือมัดจำของการเช่าที่ยังไม่ปิดงาน
+$figures = $conn->query("SELECT
+    (SELECT COUNT(*) FROM rentals WHERE rental_status = 'Shipped') AS on_rent,
+    (SELECT COALESCE(SUM(daily_price * rental_days), 0) FROM rentals
+        WHERE rental_status NOT IN ('Pending', 'Cancelled')
+          AND rental_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND rental_date < DATE_FORMAT(CURDATE(), '%Y-%m-01') + INTERVAL 1 MONTH) AS month_rent,
+    (SELECT COALESCE(SUM(deposit_fee), 0) FROM rentals WHERE rental_status IN ('Accepted', 'Preparing', 'Shipped', 'Returning', 'Received')) AS deposits_held,
+    (SELECT COUNT(*) FROM customers WHERE customers_member = 'yes' AND (member_until IS NULL OR member_until >= CURDATE())) AS members")->fetch_assoc();
+
+$soon = SOON_DAYS;
+$base = "SELECT r.rental_id, r.product_id, p.brand, r.rental_date, r.due_date, r.rental_status,
+    o.customers_id, c.customers_firstname, c.customers_lastname, c.phonenumber
+    FROM rentals r
+    JOIN orders o ON o.order_id = r.order_id
+    JOIN customers c ON c.customers_id = o.customers_id
+    LEFT JOIN products p ON p.product_id = r.product_id";
+$ship_soon = $conn->query("$base WHERE r.rental_status IN ('Accepted', 'Preparing') AND r.rental_date <= CURDATE() + INTERVAL $soon DAY
+    ORDER BY r.rental_date, r.rental_id")->fetch_all(MYSQLI_ASSOC);
+$due_soon = $conn->query("$base WHERE r.rental_status = 'Shipped' AND r.due_date <= CURDATE() + INTERVAL $soon DAY
+    ORDER BY r.due_date, r.rental_id")->fetch_all(MYSQLI_ASSOC);
+
+$cards = [
+    ['orders', 'คำสั่งรอตรวจสลิป', 'orders.php', 'todo'],
+    ['to_ship', 'รอเตรียมและจัดส่ง', 'orders.php', 'todo'],
+    ['overdue', 'เกินกำหนดคืน', 'orders.php', 'urgent'],
+    ['incoming', 'กำลังส่งคืน', 'returns.php', 'todo'],
+    ['inspect', 'รอตรวจสภาพ', 'returns.php', 'todo'],
+    ['members', 'คำขอสมาชิก', 'members.php', 'todo'],
+];
+$customer_name = fn(array $row) => $row['customers_firstname'] . ' ' . $row['customers_lastname'];
+
+page_start('ภาพรวม', 'admin', 'dashboard');
 ?>
 <div class="page-head">
-    <h1>สินค้า</h1>
-    <div class="actions" style="margin: 0;">
-        <?php if (demo_mode()): ?>
-            <form action="demo_reset.php" method="POST" class="inline-form" onsubmit="return confirm('ล้างข้อมูลทั้งหมดกลับเป็นค่าตั้งต้นของเดโม?');">
-                <?php echo csrf_field(); ?>
-                <button type="submit" class="btn btn-outline">รีเซ็ตข้อมูลเดโม</button>
-            </form>
-        <?php endif; ?>
-        <a href="product_add.php" class="btn">+ เพิ่มสินค้า</a>
-    </div>
+    <h1>ภาพรวม</h1>
+    <?php if (demo_mode()): ?>
+        <form action="demo_reset.php" method="POST" class="inline-form" onsubmit="return confirm('ล้างข้อมูลทั้งหมดกลับเป็นค่าตั้งต้นของเดโม?');">
+            <?php echo csrf_field(); ?>
+            <button type="submit" class="btn btn-outline">รีเซ็ตข้อมูลเดโม</button>
+        </form>
+    <?php endif; ?>
 </div>
 <?php render_alert(take_flash()); ?>
 
-<?php if (array_sum($pending) > 0): ?>
-    <div class="alert alert-info">
-        งานที่รอทำ:
-        <a href="orders.php">ตรวจสลิป <?php echo (int) $pending['orders']; ?> คำสั่ง</a> ·
-        <a href="orders.php">เตรียมและจัดส่ง <?php echo (int) $pending['to_ship']; ?> ใบ</a> ·
-        <a href="orders.php">เกินกำหนดคืน <?php echo (int) $pending['overdue']; ?> ใบ</a> ·
-        <a href="returns.php">กำลังส่งคืน <?php echo (int) $pending['incoming']; ?> ใบ</a> ·
-        <a href="returns.php">ตรวจสภาพ <?php echo (int) $pending['inspect']; ?> ใบ</a> ·
-        <a href="members.php">คำขอสมาชิก <?php echo (int) $pending['members']; ?></a>
-    </div>
-<?php endif; ?>
+<h2>งานที่ต้องทำ</h2>
+<div class="stat-grid">
+    <?php foreach ($cards as [$key, $label, $href, $tone]): $count = (int) $todo[$key]; ?>
+        <a class="stat-card <?php echo $count > 0 ? $tone : 'idle'; ?>" href="<?php echo $href; ?>">
+            <div class="stat-num"><?php echo $count; ?></div>
+            <div class="stat-label"><?php echo e($label); ?></div>
+        </a>
+    <?php endforeach; ?>
+</div>
 
-<form action="index.php" method="GET" class="search">
-    <input type="text" name="search" placeholder="ค้นหายี่ห้อหรือรุ่น..." value="<?php echo e($search); ?>">
-    <button type="submit">ค้นหา</button>
-</form>
+<h2>ตัวเลขของร้าน</h2>
+<div class="stat-grid">
+    <div class="stat-card"><div class="stat-num"><?php echo (int) $figures['on_rent']; ?></div><div class="stat-label">ใบที่อยู่กับลูกค้า</div></div>
+    <div class="stat-card"><div class="stat-num"><?php echo number_format($figures['month_rent']); ?></div><div class="stat-label">ค่าเช่าเดือนนี้ (บาท)</div></div>
+    <div class="stat-card"><div class="stat-num"><?php echo number_format($figures['deposits_held']); ?></div><div class="stat-label">มัดจำที่ถืออยู่ (บาท)</div></div>
+    <div class="stat-card"><div class="stat-num"><?php echo (int) $figures['members']; ?></div><div class="stat-label">สมาชิกที่ยังไม่หมดอายุ</div></div>
+</div>
 
-<?php if ($products): ?>
-    <div class="product-grid">
-        <?php foreach ($products as $product): ?>
-            <div class="product-card">
-                <img src="<?php echo e(product_image_url($product, '../')); ?>" alt="<?php echo e($product['brand'] . ' ' . $product['details']); ?>" loading="lazy">
-                <p class="product-meta"><?php echo e($product['product_id']); ?></p>
-                <h3><?php echo e($product['brand']); ?></h3>
-                <p class="details"><?php echo e($product['details']); ?></p>
-                <p class="price"><?php echo baht($product['daily_rental_price']); ?> / วัน</p>
+<div class="stack">
+    <section class="card">
+        <h2>ต้องจัดส่งภายใน <?php echo SOON_DAYS; ?> วัน</h2>
+        <?php if ($ship_soon): ?>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead><tr><th>รหัสการเช่า</th><th>สินค้า</th><th>ลูกค้า</th><th>วันเริ่มเช่า</th><th>สถานะ</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($ship_soon as $row): ?>
+                            <tr>
+                                <td><?php echo e($row['rental_id']); ?></td>
+                                <td><?php echo e($row['product_id'] . ' ' . $row['brand']); ?></td>
+                                <td><?php echo e($customer_name($row)); ?></td>
+                                <td><?php echo e(thai_date($row['rental_date'])); ?><?php if ($row['rental_date'] < date('Y-m-d')): ?> <span class="badge badge-danger">เลยวันเริ่มเช่า</span><?php endif; ?></td>
+                                <td><?php echo status_badge($row); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
-        <?php endforeach; ?>
-    </div>
-<?php else: ?>
-    <p class="text-center muted">ไม่พบสินค้าที่ค้นหา</p>
-<?php endif; ?>
+            <a href="orders.php" class="btn btn-outline btn-sm" style="margin-top: 12px;">ไปที่คำสั่งเช่า</a>
+        <?php else: ?>
+            <p class="muted">ไม่มีกระเป๋าที่ต้องส่งในช่วงนี้</p>
+        <?php endif; ?>
+    </section>
+
+    <section class="card">
+        <h2>ครบกำหนดคืนภายใน <?php echo SOON_DAYS; ?> วัน และเกินกำหนด</h2>
+        <?php if ($due_soon): ?>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead><tr><th>รหัสการเช่า</th><th>สินค้า</th><th>ลูกค้า</th><th>ส่งคืนภายใน</th><th>สถานะ</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($due_soon as $row): ?>
+                            <tr>
+                                <td><?php echo e($row['rental_id']); ?></td>
+                                <td><?php echo e($row['product_id'] . ' ' . $row['brand']); ?></td>
+                                <td><?php echo e($customer_name($row)); ?><div class="hint"><?php echo e($row['phonenumber']); ?></div></td>
+                                <td><?php echo e(thai_date($row['due_date'])); ?></td>
+                                <td><?php echo status_badge($row); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php else: ?>
+            <p class="muted">ไม่มีกระเป๋าที่ใกล้ครบกำหนดคืน</p>
+        <?php endif; ?>
+    </section>
+</div>
 <?php page_end(); ?>

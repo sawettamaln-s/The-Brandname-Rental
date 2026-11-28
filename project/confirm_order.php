@@ -77,4 +77,4 @@ try {
 
 unset($_SESSION['cart']);
 flash("ส่งคำสั่งเช่า $order_id (" . count($lines) . " ใบ) แล้ว ร้านจะตรวจสลิปและจัดส่งตามวันเริ่มเช่าค่ะ");
-redirect("profile.php");
+redirect("rentals.php");

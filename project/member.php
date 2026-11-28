@@ -43,7 +43,7 @@ page_start('สมัครสมาชิก', 'shop', 'profile');
         <p class="muted">อายุสมาชิก 1 ปีนับจากวันที่ร้านอนุมัติ</p>
 
         <?php if ($already_member): ?>
-            <div class="alert alert-success">คุณเป็นสมาชิกอยู่แล้ว<?php echo $user['member_until'] ? ' (ถึง ' . e($user['member_until']) . ')' : ''; ?></div>
+            <div class="alert alert-success">คุณเป็นสมาชิกอยู่แล้ว<?php echo $user['member_until'] ? ' (ถึง ' . e(thai_date($user['member_until'])) . ')' : ''; ?></div>
         <?php elseif ($pending): ?>
             <div class="alert alert-info">ส่งสลิปแล้ว รอร้านตรวจสอบและอนุมัติค่ะ</div>
         <?php else: ?>

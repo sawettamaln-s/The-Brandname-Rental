@@ -3,7 +3,7 @@ require_once 'includes/db.php';
 
 $customer_id = require_customer();
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    redirect("profile.php");
+    redirect("rentals.php");
 }
 verify_csrf();
 
@@ -12,7 +12,7 @@ $track_return = strtoupper(input('track_return'));
 
 if (!preg_match('/^[A-Z0-9&\-]{8,50}$/', $track_return)) {
     flash("เลขพัสดุไม่ถูกต้อง (ตัวอักษรภาษาอังกฤษหรือตัวเลข 8–50 ตัว)", "error");
-    redirect("profile.php");
+    redirect("rentals.php");
 }
 
 // ส่งคืนได้เฉพาะรายการเช่าของตัวเองที่ร้านจัดส่งแล้ว (Shipped) และยังไม่ได้แจ้งคืน
@@ -25,7 +25,7 @@ $stmt->close();
 
 if (!$allowed) {
     flash("ไม่สามารถแจ้งคืนรายการนี้ได้", "error");
-    redirect("profile.php");
+    redirect("rentals.php");
 }
 
 $store = $conn->query("SELECT postal_code FROM stores LIMIT 1")->fetch_assoc();
@@ -54,4 +54,4 @@ try {
         error_log('process_return failed: ' . $e->getMessage());
     }
 }
-redirect("profile.php");
+redirect("rentals.php");

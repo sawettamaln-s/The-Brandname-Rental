@@ -74,6 +74,7 @@ function shop_nav(): array
     if (!empty($_SESSION['customers_id'])) {
         $count = cart_count();
         $items[] = ['key' => 'cart', 'label' => 'ตะกร้า' . ($count ? " ($count)" : ''), 'href' => 'cart.php'];
+        $items[] = ['key' => 'rentals', 'label' => 'การเช่าของฉัน', 'href' => 'rentals.php'];
         $items[] = ['key' => 'profile', 'label' => 'โปรไฟล์', 'href' => 'profile.php'];
         $items[] = ['key' => 'logout', 'label' => 'ออกจากระบบ', 'post' => 'logout.php'];
     } else {
@@ -89,7 +90,8 @@ function admin_nav(): array
         return [['key' => 'shop', 'label' => 'กลับหน้าร้าน', 'href' => '../index.php']];
     }
     return [
-        ['key' => 'products', 'label' => 'สินค้า', 'href' => 'index.php'],
+        ['key' => 'dashboard', 'label' => 'ภาพรวม', 'href' => 'index.php'],
+        ['key' => 'products', 'label' => 'สินค้า', 'href' => 'products.php'],
         ['key' => 'orders', 'label' => 'คำสั่งเช่า', 'href' => 'orders.php'],
         ['key' => 'returns', 'label' => 'การคืน', 'href' => 'returns.php'],
         ['key' => 'members', 'label' => 'อนุมัติสมาชิก', 'href' => 'members.php'],
@@ -113,7 +115,7 @@ function reminder_banner(): void
     echo '<div class="reminder-bar' . ($urgent ? ' urgent' : '') . '"><div class="container">';
     echo '<strong>แจ้งเตือนวันคืน</strong> ';
     echo implode(' · ', array_map(fn($r) => e($r['text']), $reminders));
-    echo ' · <a href="profile.php#return-form">แจ้งเลขพัสดุส่งคืน</a>';
+    echo ' · <a href="rentals.php#return-form">แจ้งเลขพัสดุส่งคืน</a>';
     echo '</div></div>';
 }
 

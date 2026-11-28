@@ -4,7 +4,8 @@ require_admin();
 
 // การคืนของมี 2 ขั้น:
 // 1) ของถึงร้าน: Returning → Received และบันทึกวันที่ได้รับของในตาราง returnss
-// 2) ตรวจสภาพ: Received → Completed (คืนมัดจำเต็ม) หรือ Deducted (หักมัดจำตามยอดที่กรอก พร้อมหมายเหตุ)
+// 2) ตรวจสภาพ: Received → Completed (คืนมัดจำเต็ม) หรือ Deducted (มีค่าเสียหาย พร้อมหมายเหตุ)
+//    ค่าเสียหายหักจากมัดจำก่อน ส่วนที่เกินมัดจำลูกค้าต้องชำระเพิ่ม (สมาชิกที่ไม่มีมัดจำก็บันทึกได้)
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     verify_csrf();
     $rental_id = input('rental_id');
@@ -45,10 +46,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         if (!$rental) {
             flash("รายการนี้ไม่อยู่ในสถานะรอตรวจสภาพ", "error");
-        } elseif ($deduction === false || $deduction > (int) $rental['deposit_fee']) {
-            flash("ยอดหักต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง " . number_format($rental['deposit_fee']) . " บาท (ไม่เกินค่ามัดจำ)", "error");
+        } elseif ($deduction === false || $deduction > 1000000) {
+            flash("ค่าเสียหายต้องเป็นจำนวนเต็มบาท ตั้งแต่ 1 บาทขึ้นไป", "error");
         } elseif ($action === 'deduct' && $note === '') {
-            flash("กรุณาระบุหมายเหตุว่าหักค่าอะไร ลูกค้าจะเห็นข้อความนี้", "error");
+            flash("กรุณาระบุหมายเหตุว่าเสียหายอะไร ลูกค้าจะเห็นข้อความนี้", "error");
         } elseif (mb_strlen($note) > 255) {
             flash("หมายเหตุยาวเกิน 255 ตัวอักษร", "error");
         } else {
@@ -67,9 +68,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $stmt->close();
                 $conn->commit();
 
-                $refund = (int) $rental['deposit_fee'] - $deduction;
+                $refund = max(0, (int) $rental['deposit_fee'] - $deduction);
+                $extra = max(0, $deduction - (int) $rental['deposit_fee']);
                 flash($deduction > 0
-                    ? "บันทึก $rental_id: หักมัดจำ " . baht($deduction) . " คืนลูกค้า " . baht($refund)
+                    ? "บันทึก $rental_id: ค่าเสียหาย " . baht($deduction) . " คืนมัดจำ " . baht($refund) . ($extra > 0 ? " ลูกค้าต้องชำระเพิ่ม " . baht($extra) : '')
                     : "บันทึก $rental_id: เสร็จสมบูรณ์ คืนมัดจำเต็ม " . baht($refund));
             } catch (mysqli_sql_exception $e) {
                 $conn->rollback();
@@ -122,7 +124,7 @@ page_start('การคืนสินค้า', 'admin', 'returns');
                                 <td><?php echo e($customer_name($row)); ?></td>
                                 <td><?php echo e($row['product_id'] . ' ' . $row['brand']); ?></td>
                                 <td><?php echo e($row['track_return']); ?></td>
-                                <td><?php echo e($row['due_date']); ?></td>
+                                <td><?php echo e(thai_date($row['due_date'])); ?></td>
                                 <td class="text-right">
                                     <form method="POST" class="inline-form">
                                         <?php echo csrf_field(); ?>
@@ -142,7 +144,7 @@ page_start('การคืนสินค้า', 'admin', 'returns');
 
     <section class="card">
         <h2>2. ตรวจสภาพ (<?php echo count($to_inspect); ?>)</h2>
-        <p class="muted">สภาพดีกด "คืนมัดจำเต็ม" ถ้าเสียหาย กรอกยอดที่หัก (ไม่เกินค่ามัดจำ) และหมายเหตุว่าหักค่าอะไร แล้วกด "หักมัดจำ" ลูกค้าจะเห็นยอดและหมายเหตุในหน้าโปรไฟล์</p>
+        <p class="muted">สภาพดีกด "คืนมัดจำเต็ม" ถ้าเสียหาย กรอกค่าเสียหายและหมายเหตุว่าเสียหายอะไร แล้วกด "หักมัดจำ" ระบบหักจากมัดจำก่อน ส่วนที่เกินมัดจำ ลูกค้าจะเห็นว่าต้องชำระเพิ่ม (ร้านติดต่อเรียกเก็บเอง)</p>
         <?php if ($to_inspect): ?>
             <div class="table-wrap">
                 <table class="table">
@@ -162,27 +164,21 @@ page_start('การคืนสินค้า', 'admin', 'returns');
                                 <td><?php echo e($row['rental_id']); ?></td>
                                 <td><?php echo e($customer_name($row)); ?></td>
                                 <td><?php echo e($row['product_id'] . ' ' . $row['brand']); ?></td>
-                                <td class="nowrap"><?php echo e($row['return_date']); ?></td>
+                                <td class="nowrap"><?php echo e(thai_date($row['return_date'])); ?></td>
                                 <td class="num"><?php echo baht($deposit); ?></td>
                                 <td>
                                     <form method="POST" class="inspect-form">
                                         <?php echo csrf_field(); ?>
                                         <input type="hidden" name="rental_id" value="<?php echo e($row['rental_id']); ?>">
-                                        <?php if ($deposit > 0): ?>
-                                            <input type="number" name="deduction" min="1" max="<?php echo $deposit; ?>" step="1" placeholder="ยอดหัก บาท" aria-label="ยอดที่หักจากมัดจำ">
-                                            <input type="text" name="deduction_note" maxlength="255" placeholder="หมายเหตุ เช่น สายขาด" aria-label="หมายเหตุการหักมัดจำ">
-                                        <?php else: ?>
-                                            <input type="text" name="deduction_note" maxlength="255" placeholder="หมายเหตุ (ถ้ามี)" aria-label="หมายเหตุถึงลูกค้า">
-                                        <?php endif; ?>
+                                        <input type="number" name="deduction" min="1" step="1" placeholder="ค่าเสียหาย" aria-label="ค่าเสียหาย (บาท)">
+                                        <input type="text" name="deduction_note" maxlength="255" placeholder="หมายเหตุ เช่น สายขาด" aria-label="หมายเหตุถึงลูกค้า">
                                         <div class="inspect-actions">
-                                            <?php if ($deposit > 0): ?>
-                                                <button type="submit" name="action" value="deduct" class="btn btn-danger btn-sm">หักมัดจำ</button>
-                                            <?php endif; ?>
+                                            <button type="submit" name="action" value="deduct" class="btn btn-danger btn-sm"><?php echo $deposit > 0 ? 'หักมัดจำ' : 'บันทึกค่าเสียหาย'; ?></button>
                                             <button type="submit" name="action" value="complete" class="btn btn-success btn-sm"><?php echo $deposit > 0 ? 'คืนมัดจำเต็ม' : 'เสร็จสมบูรณ์'; ?></button>
                                         </div>
                                     </form>
                                     <?php if ($deposit === 0): ?>
-                                        <div class="hint text-right">ลูกค้าสมาชิกไม่มีมัดจำ ถ้าเสียหายให้เขียนหมายเหตุแล้วติดต่อลูกค้าเรียกเก็บแยก</div>
+                                        <div class="hint text-right">สมาชิกไม่มีมัดจำ ค่าเสียหายทั้งหมดลูกค้าต้องชำระเพิ่ม</div>
                                     <?php endif; ?>
                                 </td>
                             </tr>

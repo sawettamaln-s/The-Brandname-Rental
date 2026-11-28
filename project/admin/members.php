@@ -39,7 +39,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
 
             $conn->commit();
-            flash($approve ? "อนุมัติสมาชิก {$request['customers_id']} ถึง $until แล้ว" : "ปฏิเสธคำขอของ {$request['customers_id']} แล้ว");
+            flash($approve ? "อนุมัติสมาชิก {$request['customers_id']} ถึง " . thai_date($until) . " แล้ว" : "ปฏิเสธคำขอของ {$request['customers_id']} แล้ว");
         } catch (mysqli_sql_exception $e) {
             $conn->rollback();
             error_log('admin members failed: ' . $e->getMessage());
@@ -74,7 +74,7 @@ page_start('อนุมัติสมาชิก', 'admin', 'members');
             <tbody>
                 <?php foreach ($requests as $row): ?>
                     <tr>
-                        <td><?php echo e($row['created_at']); ?></td>
+                        <td><?php echo e(thai_date($row['created_at'])); ?></td>
                         <td><?php echo e($row['customers_id'] . ' ' . $row['customers_firstname'] . ' ' . $row['customers_lastname']); ?></td>
                         <td><?php echo e($row['email']); ?></td>
                         <td><a href="slip.php?id=<?php echo (int) $row['request_id']; ?>" target="_blank" rel="noopener">เปิดดูสลิป</a></td>

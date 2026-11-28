@@ -42,6 +42,22 @@ function baht($amount): string
     return number_format((float) $amount, 2) . ' บาท';
 }
 
+const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+/** วันที่แบบไทย เช่น 2026-11-28 → 28 พ.ย. 2569 ถ้าเป็นวันที่และเวลาจะต่อท้ายด้วยเวลา เช่น 28 พ.ย. 2569 12:37 ค่าว่างได้ "-" */
+function thai_date(?string $value): string
+{
+    if ($value === null || $value === '') {
+        return '-';
+    }
+    $time = strtotime($value);
+    if ($time === false) {
+        return $value;
+    }
+    $text = (int) date('j', $time) . ' ' . THAI_MONTHS[(int) date('n', $time) - 1] . ' ' . ((int) date('Y', $time) + 543);
+    return strlen($value) > 10 ? $text . ' ' . date('H:i', $time) : $text;
+}
+
 // ---------- CSRF: ทุกฟอร์ม POST ต้องส่ง token นี้มาด้วย ----------
 function csrf_token(): string
 {
@@ -183,6 +199,8 @@ function status_badge(array $rental): string
     [$label, $tone] = RENTAL_STATUS[rental_stage($rental)] ?? [$rental['rental_status'], 'pending'];
     if (is_overdue($rental)) {
         [$label, $tone] = ['เกินกำหนดคืน', 'danger'];
+    } elseif ($rental['rental_status'] === 'Deducted' && (int) ($rental['deposit_fee'] ?? 0) === 0) {
+        $label = 'มีค่าเสียหาย';  // สมาชิกไม่มีมัดจำให้หัก
     }
     return '<span class="badge badge-' . $tone . '">' . e($label) . '</span>';
 }
@@ -197,12 +215,13 @@ function status_hint(array $rental): string
         'Accepted' => 'ร้านรับเรื่องแล้ว จะจัดส่งให้ถึงก่อนวันเริ่มเช่า',
         'Preparing' => 'ร้านกำลังเตรียมกระเป๋าเพื่อจัดส่ง',
         'Shipped' => 'จัดส่งแล้ว เลขพัสดุ ' . ($rental['track_rentals'] ?? '-'),
-        'OnRent' => is_overdue($rental) ? 'กรุณาส่งคืนและแจ้งเลขพัสดุโดยเร็ว' : 'ส่งคืนภายใน ' . $rental['due_date'],
+        'OnRent' => is_overdue($rental) ? 'กรุณาส่งคืนและแจ้งเลขพัสดุโดยเร็ว' : 'ส่งคืนภายใน ' . thai_date($rental['due_date']),
         'Returning' => 'รอร้านได้รับของ เลขพัสดุคืน ' . ($rental['track_return'] ?? '-'),
         'Received' => 'ร้านได้รับของแล้ว กำลังตรวจสภาพเพื่อพิจารณามัดจำ',
         'Completed' => $deposit > 0 ? 'คืนมัดจำเต็ม ' . baht($deposit) : 'คืนกระเป๋าเรียบร้อย',
-        'Deducted' => 'หักมัดจำ ' . baht($deduction) . ($rental['deduction_note'] ? ': ' . $rental['deduction_note'] : ''),
-        'Cancelled' => 'ร้านปฏิเสธสลิป หากโอนเงินแล้วกรุณาติดต่อร้าน',
+        'Deducted' => 'ค่าเสียหาย ' . baht($deduction) . ($rental['deduction_note'] ? ': ' . $rental['deduction_note'] : '')
+            . (extra_charge($rental) > 0 ? ' · ต้องชำระเพิ่ม ' . baht(extra_charge($rental)) . ' กรุณาติดต่อร้าน' : ''),
+        'Cancelled' => ($rental['cancelled_by'] ?? '') === 'customer' ? 'คุณยกเลิกคำสั่งนี้แล้ว' : 'ร้านปฏิเสธสลิป หากโอนเงินแล้วกรุณาติดต่อร้าน',
         default => '',
     };
 }
@@ -213,13 +232,19 @@ function is_overdue(array $rental): bool
     return ($rental['rental_status'] ?? '') === 'Shipped' && $rental['due_date'] < date('Y-m-d');
 }
 
-/** มัดจำที่ลูกค้าได้คืนหลังร้านตรวจสภาพ = ค่ามัดจำ − ยอดที่หัก ยังไม่ตรวจได้ null */
+/** มัดจำที่ลูกค้าได้คืนหลังร้านตรวจสภาพ = ค่ามัดจำ − ค่าเสียหาย (ไม่ต่ำกว่า 0) ยังไม่ตรวจได้ null */
 function deposit_refund(array $rental): ?int
 {
     if (!in_array($rental['rental_status'], ['Completed', 'Deducted'], true)) {
         return null;
     }
-    return (int) $rental['deposit_fee'] - (int) ($rental['deduction'] ?? 0);
+    return max(0, (int) $rental['deposit_fee'] - (int) ($rental['deduction'] ?? 0));
+}
+
+/** ค่าเสียหายส่วนที่เกินมัดจำ ลูกค้าต้องชำระเพิ่ม (เช่น สมาชิกที่ไม่มีมัดจำ) */
+function extra_charge(array $rental): int
+{
+    return max(0, (int) ($rental['deduction'] ?? 0) - (int) $rental['deposit_fee']);
 }
 
 /**
@@ -316,7 +341,7 @@ function booked_ranges(mysqli $conn, string $product_id): array
 
 function conflict_message(array $conflicts): string
 {
-    $ranges = array_map(fn($c) => $c['rental_date'] . ' ถึง ' . $c['busy_until'], $conflicts);
+    $ranges = array_map(fn($c) => thai_date($c['rental_date']) . ' ถึง ' . thai_date($c['busy_until']), $conflicts);
     return 'กระเป๋าใบนี้ไม่ว่างช่วง ' . implode(', ', $ranges) . ' กรุณาเลือกวันอื่น';
 }
 

@@ -94,6 +94,7 @@ CREATE TABLE orders (
     slip_file    VARCHAR(100) NULL,       -- ชื่อไฟล์สลิปใน uploads/slips (ข้อมูลตัวอย่างไม่มีไฟล์สลิป)
     created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reviewed_at  DATETIME     NULL,       -- เวลาที่ร้านตรวจสลิป
+    cancelled_by ENUM('shop', 'customer') NULL,  -- ใครยกเลิก: ร้านปฏิเสธสลิป หรือลูกค้ายกเลิกเองก่อนร้านตรวจ
     FOREIGN KEY (customers_id) REFERENCES customers(customers_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -122,7 +123,7 @@ INSERT INTO orders (order_id, customers_id, slip_file, created_at, reviewed_at) 
 --        → Shipped จัดส่งแล้ว (หน้าเว็บแสดง "อยู่ระหว่างเช่า" เมื่อถึงวันเริ่มเช่า)
 --        → Returning กำลังส่งคืน → Received ร้านได้รับของ รอตรวจสภาพ
 --        → Completed เสร็จสมบูรณ์ คืนมัดจำเต็ม / Deducted หักมัดจำ (ยอดและเหตุผลอยู่ใน returnss)
---        Cancelled = ร้านปฏิเสธสลิป
+--        Cancelled = ร้านปฏิเสธสลิป หรือลูกค้ายกเลิกเองระหว่างรอตรวจสลิป (ดู orders.cancelled_by)
 -- employees_id (พนักงานที่จัดส่ง), track_rentals (เลขพัสดุ) และ shipped_date บันทึกตอนร้านจัดส่ง
 CREATE TABLE rentals (
     rental_id     VARCHAR(50) PRIMARY KEY,
@@ -164,7 +165,8 @@ INSERT INTO rentals (rental_id, order_id, product_id, employees_id, track_rental
 ('Ren1124', 'ORD0014', 'PD0009', 'E004', 'FA246813579TH', CURDATE() - INTERVAL 7 DAY, 3, 1500, 900, CURDATE() - INTERVAL 8 DAY, 'Received');
 
 -- การคืนของที่ร้านได้รับแล้ว: return_date คือวันที่ร้านได้รับของ (บันทึกเมื่อแอดมินกด "ได้รับของแล้ว")
--- deduction คือยอดที่หักจากมัดจำหลังตรวจสภาพ (0 = คืนมัดจำเต็ม) และ deduction_note คือเหตุผลที่หัก
+-- deduction คือค่าเสียหายหลังตรวจสภาพ (0 = คืนมัดจำเต็ม) หักจากมัดจำก่อน ส่วนที่เกินมัดจำลูกค้าต้องชำระเพิ่ม
+-- (เช่น สมาชิกที่ไม่มีมัดจำ) และ deduction_note คือเหตุผล
 CREATE TABLE returnss (
     return_id      VARCHAR(50)  PRIMARY KEY,
     rental_id      VARCHAR(50)  NOT NULL UNIQUE,

@@ -43,6 +43,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $booked = booked_ranges($conn, $product['product_id']);
 
+// มัดจำของผู้ที่กำลังดู: ลูกค้าที่ล็อกอินคิดตามสถานะสมาชิก ผู้ที่ยังไม่ล็อกอินแสดงมัดจำของลูกค้าทั่วไป
+$viewer = !empty($_SESSION['customers_id']) ? find_customer($conn, $_SESSION['customers_id']) : null;
+$deposit = $viewer ? deposit_for($viewer) : DEPOSIT_FEE;
+$deposit_note = $viewer ? (is_member($viewer) ? 'สมาชิกไม่ต้องวางมัดจำ' : 'มัดจำได้คืนเมื่อคืนกระเป๋าสภาพดี') : 'ถ้าเป็นสมาชิก ไม่ต้องวางมัดจำ';
+
 page_start($product['brand'] . ' ' . $product['details'], 'shop', 'home');
 ?>
 <div class="product-detail">
@@ -61,7 +66,7 @@ page_start($product['brand'] . ' ' . $product['details'], 'shop', 'home');
             <?php if ($booked): ?>
                 <ul>
                     <?php foreach ($booked as $range): ?>
-                        <li><?php echo e($range['rental_date']); ?> ถึง <?php echo e($range['busy_until']); ?></li>
+                        <li><?php echo e(thai_date($range['rental_date'])); ?> ถึง <?php echo e(thai_date($range['busy_until'])); ?></li>
                     <?php endforeach; ?>
                 </ul>
             <?php else: ?>
@@ -76,13 +81,21 @@ page_start($product['brand'] . ' ' . $product['details'], 'shop', 'home');
             <?php echo csrf_field(); ?>
             <div class="field">
                 <label for="quantity">จำนวนวัน</label>
-                <input type="number" name="quantity" id="quantity" min="1" max="<?php echo MAX_RENTAL_DAYS; ?>" value="<?php echo e($_POST['quantity'] ?? 1); ?>" required>
+                <input type="number" name="quantity" id="quantity" min="1" max="<?php echo MAX_RENTAL_DAYS; ?>" value="<?php echo e(input('quantity') ?: 1); ?>" required>
             </div>
             <div class="field">
                 <label for="rental_date">วันที่เริ่มเช่า</label>
                 <input type="date" name="rental_date" id="rental_date" min="<?php echo $today; ?>" value="<?php echo e(input('rental_date')); ?>" required>
             </div>
-            <div class="hint full">ส่งคืนภายในวันที่ = วันเริ่มเช่า + จำนวนวัน เช่น เริ่ม 5 ธ.ค. เช่า 3 วัน ส่งคืนภายใน 8 ธ.ค.</div>
+            <div class="full quote" id="quote" data-price="<?php echo (int) $product['daily_rental_price']; ?>" data-deposit="<?php echo $deposit; ?>"
+                 data-turnaround="<?php echo TURNAROUND_DAYS; ?>" data-booked="<?php echo e(json_encode(array_map(fn($r) => [$r['rental_date'], $r['busy_until']], $booked))); ?>">
+                <div class="quote-row"><span>ส่งคืนภายใน</span><strong id="quote-due">เลือกวันที่เริ่มเช่า</strong></div>
+                <div class="quote-row"><span>ค่าเช่า <span id="quote-days">1</span> วัน</span><span id="quote-rent"><?php echo baht($product['daily_rental_price']); ?></span></div>
+                <div class="quote-row"><span>ค่ามัดจำ</span><span><?php echo baht($deposit); ?></span></div>
+                <div class="quote-row quote-total"><span>รวมที่ต้องโอน</span><strong id="quote-total"><?php echo baht($product['daily_rental_price'] + $deposit); ?></strong></div>
+                <div class="hint"><?php echo e($deposit_note); ?></div>
+                <div class="problem" id="quote-conflict" hidden>ช่วงนี้กระเป๋าไม่ว่าง กรุณาเลือกวันอื่น</div>
+            </div>
             <div class="full actions">
                 <button type="submit" class="btn">เพิ่มลงตะกร้า</button>
                 <a href="index.php" class="btn btn-outline">ย้อนกลับ</a>
@@ -90,4 +103,41 @@ page_start($product['brand'] . ' ' . $product['details'], 'shop', 'home');
         </form>
     </div>
 </div>
+<script>
+// คำนวณวันคืนและยอดรวมทันทีที่เปลี่ยนวันหรือจำนวนวัน และเตือนถ้าช่วงที่เลือกทับช่วงที่ไม่ว่าง (เซิร์ฟเวอร์ตรวจซ้ำตอนเพิ่มลงตะกร้า)
+(function () {
+    const quote = document.getElementById('quote');
+    const daysInput = document.getElementById('quantity');
+    const dateInput = document.getElementById('rental_date');
+    const price = Number(quote.dataset.price);
+    const deposit = Number(quote.dataset.deposit);
+    const turnaround = Number(quote.dataset.turnaround);
+    const booked = JSON.parse(quote.dataset.booked);
+    const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const money = (n) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' บาท';
+    const parse = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+    const addDays = (date, n) => new Date(date.getTime() + n * 86400000);
+    const thai = (date) => date.getUTCDate() + ' ' + months[date.getUTCMonth()] + ' ' + (date.getUTCFullYear() + 543);
+
+    function update() {
+        const days = Math.min(Math.max(parseInt(daysInput.value, 10) || 0, 0), <?php echo MAX_RENTAL_DAYS; ?>);
+        document.getElementById('quote-days').textContent = days;
+        document.getElementById('quote-rent').textContent = money(price * days);
+        document.getElementById('quote-total').textContent = money(price * days + deposit);
+        let conflict = false;
+        if (dateInput.value && days > 0) {
+            const start = parse(dateInput.value);
+            document.getElementById('quote-due').textContent = thai(addDays(start, days));
+            const end = addDays(start, days + turnaround);  // ไม่รวมวันนี้ แบบเดียวกับ booking_conflicts()
+            conflict = booked.some(([from, until]) => parse(from) < end && start < addDays(parse(until), 1));
+        } else {
+            document.getElementById('quote-due').textContent = 'เลือกวันที่เริ่มเช่า';
+        }
+        document.getElementById('quote-conflict').hidden = !conflict;
+    }
+    daysInput.addEventListener('input', update);
+    dateInput.addEventListener('input', update);
+    update();
+})();
+</script>
 <?php page_end(); ?>
