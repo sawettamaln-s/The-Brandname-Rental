@@ -23,10 +23,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $error = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
 }
 
-page_start('เข้าสู่ระบบผู้ดูแล', 'admin');
+page_start('เข้าสู่ระบบหลังร้าน', 'admin');
 ?>
 <div class="card auth-card">
-    <h1>เข้าสู่ระบบผู้ดูแล</h1>
+    <div class="auth-kicker">Back office</div>
+    <h1>เข้าสู่ระบบหลังร้าน</h1>
     <?php render_alert(take_flash()); ?>
     <?php error_alert($error); ?>
     <form method="POST" class="form-grid">

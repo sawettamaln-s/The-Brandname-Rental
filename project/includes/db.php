@@ -16,6 +16,7 @@ try {
 
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/demo.php';
+require_once __DIR__ . '/icons.php';
 require_once __DIR__ . '/layout.php';
 
 if (demo_mode()) {

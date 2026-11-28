@@ -47,10 +47,10 @@ function order_card(string $order_id, array $items): void
         <div class="order-head">
             <div>
                 <h3>คำสั่ง <?php echo e($order_id); ?></h3>
-                <div class="hint">สั่งเมื่อ <?php echo e(thai_date($first['created_at'])); ?> · <?php echo count($items); ?> ใบ · ยอดโอน <?php echo baht($total); ?></div>
+                <div class="hint"><?php echo e(thai_date($first['created_at'])); ?> · <?php echo count($items); ?> ใบ · ยอดโอน <?php echo baht($total); ?></div>
             </div>
             <?php if ($cancellable): ?>
-                <form action="cancel_order.php" method="POST" class="inline-form" onsubmit="return confirm('ยกเลิกคำสั่ง <?php echo e($order_id); ?>? ถ้าโอนเงินแล้ว ร้านจะติดต่อคืนเงินให้');">
+                <form action="cancel_order.php" method="POST" class="inline-form" onsubmit="return confirm('ต้องการยกเลิกคำสั่ง <?php echo e($order_id); ?> ใช่ไหมคะ');">
                     <?php echo csrf_field(); ?>
                     <input type="hidden" name="order_id" value="<?php echo e($order_id); ?>">
                     <button type="submit" class="btn btn-outline btn-sm">ยกเลิกคำสั่ง</button>
@@ -61,7 +61,7 @@ function order_card(string $order_id, array $items): void
             <table class="table">
                 <thead>
                     <tr>
-                        <th>สินค้า</th>
+                        <th>กระเป๋า</th>
                         <th>ช่วงเช่า</th>
                         <th class="num">ค่าเช่า</th>
                         <th class="num">มัดจำ</th>
@@ -81,10 +81,10 @@ function order_card(string $order_id, array $items): void
                                 </div>
                             </td>
                             <td class="nowrap">
-                                <?php echo e(thai_date($item['rental_date'])); ?>
+                                <?php echo e(thai_date($item['rental_date'])); ?> · <?php echo e($item['rental_days']); ?> วัน
                                 <div class="hint">คืนภายใน <?php echo e(thai_date($item['due_date'])); ?></div>
                             </td>
-                            <td class="num"><?php echo baht($item['daily_price'] * $item['rental_days']); ?><div class="hint"><?php echo e($item['rental_days']); ?> วัน</div></td>
+                            <td class="num"><?php echo baht($item['daily_price'] * $item['rental_days']); ?></td>
                             <td class="num">
                                 <?php echo baht($item['deposit_fee']); ?>
                                 <?php $refund = deposit_refund($item); if ($refund !== null && $item['deposit_fee'] > 0): ?>
@@ -93,13 +93,13 @@ function order_card(string $order_id, array $items): void
                             </td>
                             <td class="status-cell">
                                 <?php echo status_badge($item); ?>
-                                <div class="hint"><?php echo e(status_hint($item)); ?></div>
+                                <?php if ($hint = status_hint($item)): ?><div class="hint"><?php echo e($hint); ?></div><?php endif; ?>
                                 <?php if ($item['rental_status'] === 'Shipped'): ?>
                                     <form action="process_return.php" method="POST" class="return-form">
                                         <?php echo csrf_field(); ?>
                                         <input type="hidden" name="rental_id" value="<?php echo e($item['rental_id']); ?>">
                                         <input type="text" name="track_return" placeholder="เลขพัสดุส่งคืน" maxlength="50" pattern="[A-Za-z0-9&\-]{8,50}" title="ตัวอักษรภาษาอังกฤษหรือตัวเลข 8–50 ตัว" aria-label="เลขพัสดุส่งคืน <?php echo e($item['rental_id']); ?>" required>
-                                        <button type="submit" class="btn btn-sm">แจ้งส่งคืน</button>
+                                        <button type="submit" class="btn btn-sm"><?php echo icon('box-heart'); ?>แจ้งส่งคืน</button>
                                     </form>
                                 <?php endif; ?>
                             </td>
@@ -118,15 +118,15 @@ page_start('การเช่าของฉัน', 'shop', 'rentals');
 <?php render_alert(take_flash()); ?>
 
 <?php if (!$orders): ?>
-    <div class="card text-center">
-        <p>ยังไม่มีการเช่า</p>
+    <div class="card empty">
+        <?php echo icon('bag'); ?>
+        <p>คุณยังไม่มีการเช่าค่ะ</p>
         <a href="index.php" class="btn">เลือกกระเป๋า</a>
     </div>
 <?php endif; ?>
 
 <?php if ($active): ?>
     <h2 id="return-form">กำลังดำเนินการ</h2>
-    <p class="muted">เมื่อส่งกระเป๋าคืน กรอกเลขพัสดุในแถวของกระเป๋าใบนั้นแล้วกด "แจ้งส่งคืน" · ยกเลิกคำสั่งเองได้ระหว่างที่ร้านยังไม่ตรวจสลิป</p>
     <div class="stack">
         <?php foreach ($active as $order_id => $items) { order_card($order_id, $items); } ?>
     </div>

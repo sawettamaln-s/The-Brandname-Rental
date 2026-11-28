@@ -112,7 +112,7 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
 <div class="stack">
     <section class="card">
         <h2>1. รอตรวจสลิป (<?php echo count($pending_orders); ?>)</h2>
-        <p class="muted">เปิดสลิปแล้วเทียบกับยอดที่ต้องได้รับ อนุมัติหรือปฏิเสธทั้งคำสั่ง เพราะลูกค้าโอนมาครั้งเดียว</p>
+        <p class="muted">ตรวจยอดในสลิปให้ตรงกับยอดที่ต้องได้รับ</p>
         <?php if (!$pending_orders): ?>
             <p class="muted">ไม่มีคำสั่งที่รอตรวจสลิป</p>
         <?php endif; ?>
@@ -179,7 +179,7 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
 
     <section class="card">
         <h2>2. เตรียมและจัดส่ง (<?php echo count($to_ship); ?>)</h2>
-        <p class="muted">กด "เริ่มเตรียมของ" เมื่อเริ่มเตรียมกระเป๋า (ลูกค้าเห็นสถานะกำลังดำเนินการ) แล้วส่งให้ถึงก่อนวันเริ่มเช่า พร้อมกรอกเลขพัสดุและพนักงานที่จัดส่ง</p>
+        <p class="muted">ส่งให้ถึงก่อนวันเริ่มเช่า</p>
         <?php if ($to_ship): ?>
             <div class="table-wrap">
                 <table class="table">
@@ -243,7 +243,6 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
 
     <section class="card">
         <h2>3. จัดส่งแล้วและอยู่ระหว่างเช่า (<?php echo count($on_rent); ?>)</h2>
-        <p class="muted">เมื่อลูกค้าแจ้งเลขพัสดุส่งคืน รายการจะย้ายไปหน้า "การคืน"</p>
         <?php if ($on_rent): ?>
             <div class="table-wrap">
                 <table class="table">

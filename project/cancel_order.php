@@ -24,9 +24,9 @@ try {
     if (!$statuses || array_diff($statuses, ['Pending'])) {
         $conn->rollback();
         flash(match (true) {
-            !$statuses => "ไม่พบคำสั่งนี้",
-            !array_diff($statuses, ['Cancelled']) => "คำสั่งนี้ถูกยกเลิกไปแล้ว",
-            default => "ยกเลิกคำสั่งนี้ไม่ได้ ร้านรับเรื่องแล้ว กรุณาติดต่อร้าน",
+            !$statuses => "ไม่พบคำสั่งนี้ค่ะ",
+            !array_diff($statuses, ['Cancelled']) => "คำสั่งนี้ถูกยกเลิกไปแล้วค่ะ",
+            default => "ร้านรับเรื่องแล้ว หากต้องการยกเลิกกรุณาติดต่อร้านค่ะ",
         }, "error");
         redirect("rentals.php");
     }
@@ -42,10 +42,10 @@ try {
     $stmt->close();
 
     $conn->commit();
-    flash("ยกเลิกคำสั่ง $order_id แล้ว ถ้าโอนเงินไปแล้ว ร้านจะติดต่อคืนเงินให้ค่ะ");
+    flash("ยกเลิกคำสั่ง $order_id แล้วค่ะ หากโอนเงินแล้ว ร้านจะติดต่อคืนเงินให้นะคะ");
 } catch (mysqli_sql_exception $e) {
     $conn->rollback();
     error_log('cancel_order failed: ' . $e->getMessage());
-    flash("ยกเลิกไม่สำเร็จ กรุณาลองใหม่", "error");
+    flash("ยกเลิกไม่สำเร็จ กรุณาลองใหม่อีกครั้งค่ะ", "error");
 }
 redirect("rentals.php");

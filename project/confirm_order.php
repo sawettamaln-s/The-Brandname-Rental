@@ -16,7 +16,7 @@ if (count($lines) === 0) {
 }
 foreach ($lines as $line) {
     if (cart_problem($line) !== null) {
-        flash("มีรายการในตะกร้าที่เช่าไม่ได้ กรุณาแก้ไขก่อนชำระเงิน", "error");
+        flash("มีรายการในตะกร้าที่เช่าไม่ได้ กรุณาแก้ไขก่อนชำระเงินนะคะ", "error");
         redirect("cart.php");
     }
 }
@@ -46,7 +46,7 @@ try {
         if (booking_conflicts($conn, $line['product_id'], $line['rental_date'], $line['days'])) {
             $conn->rollback();
             @unlink(SLIP_DIR . '/' . $slip_file);
-            flash("มีคนจอง {$line['brand']} {$line['details']} ช่วงนี้ไปก่อนแล้ว กรุณาเลือกวันใหม่", "error");
+            flash("{$line['brand']} {$line['details']} ถูกจองช่วงนี้ไปก่อนแล้ว กรุณาเลือกวันใหม่นะคะ", "error");
             redirect("cart.php");
         }
     }
@@ -71,10 +71,10 @@ try {
     $conn->rollback();
     @unlink(SLIP_DIR . '/' . $slip_file);
     error_log('confirm_order failed: ' . $e->getMessage());
-    flash("บันทึกคำสั่งเช่าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง", "error");
+    flash("บันทึกคำสั่งเช่าไม่สำเร็จ กรุณาลองใหม่อีกครั้งค่ะ", "error");
     redirect("cart.php");
 }
 
 unset($_SESSION['cart']);
-flash("ส่งคำสั่งเช่า $order_id (" . count($lines) . " ใบ) แล้ว ร้านจะตรวจสลิปและจัดส่งตามวันเริ่มเช่าค่ะ");
+flash("ได้รับคำสั่งเช่า $order_id แล้ว ร้านจะตรวจสลิปและแจ้งสถานะในหน้านี้ค่ะ");
 redirect("rentals.php");

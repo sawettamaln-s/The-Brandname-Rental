@@ -1,219 +1,395 @@
 /* ============================================================
-   สไตล์ของทั้งเว็บ (หน้าร้านและหลังบ้าน)
-   สีหลักและขนาดอยู่ที่ :root เปลี่ยนที่เดียวมีผลทั้งเว็บ
+   สไตล์ของทั้งเว็บ (หน้าร้านและหลังร้าน)
+   โทนสี: ไวน์แดงอมม่วง (merlot) ชมพูกุหลาบ ชมพูพีช ครีม และมิ้นต์
+   สีและขนาดอยู่ที่ :root เปลี่ยนที่เดียวมีผลทั้งเว็บ
    ============================================================ */
 :root {
-    --primary: #34495e;
-    --primary-dark: #2c3e50;
-    --primary-soft: #eaeef2;
-    --success: #27ae60;
-    --success-soft: #e8f6ee;
-    --danger: #e74c3c;
-    --danger-soft: #fdecea;
-    --warning: #e67e22;
-    --text: #2d3748;
-    --muted: #6b7785;
-    --border: #e2e6ea;
-    --bg: #f4f6f8;
+    --merlot: #62202f;
+    --merlot-deep: #4b1823;
+    --plum: #60435f;
+    --rose: #d67ab1;
+    --rose-soft: #e2a3c7;
+    --blush: #f5d0c6;
+    --blush-soft: #fbebe6;
+    --cream: #fbf7e8;
+    --petal: #fdf7fa;
+    --mint: #a8dcd9;
+    --mint-soft: #e4f4f2;
+    --mint-ink: #2f6e69;
+    --danger: #b0384f;
+    --danger-soft: #fbe4ea;
+    --warn-ink: #9a4a2c;
+
+    --text: #3d2530;
+    --muted: #8b7079;
+    --line: #eedbd6;
     --card: #ffffff;
-    --radius: 10px;
-    --shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
-    --font: 'Prompt', 'Segoe UI', Tahoma, sans-serif;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 6px 24px rgba(98, 32, 47, 0.07);
+    --shadow-hover: 0 12px 32px rgba(98, 32, 47, 0.13);
+    --font: 'IBM Plex Sans Thai', 'Segoe UI', Tahoma, sans-serif;
+    --font-head: 'Noto Serif Thai', Georgia, serif;
+    --scallop: 14px;
 }
 
 * { box-sizing: border-box; }
 body {
     margin: 0;
     font-family: var(--font);
+    font-weight: 400;
     color: var(--text);
-    background: var(--bg);
-    line-height: 1.6;
+    background: var(--cream);
+    line-height: 1.65;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
 }
 img { max-width: 100%; display: block; }
-a { color: var(--primary); }
-h1, h2, h3 { color: var(--primary-dark); line-height: 1.3; margin: 0 0 16px; }
-h1 { font-size: 1.7rem; }
-h2 { font-size: 1.3rem; }
+a { color: var(--merlot); }
+h1, h2, h3 { font-family: var(--font-head); font-weight: 600; color: var(--merlot); line-height: 1.3; margin: 0 0 16px; }
+/* Playfair ใช้ตัวเลขแบบสูงต่ำเป็นค่าเริ่มต้น เปลี่ยนเป็นตัวเลขแบบเรียบให้อ่านรหัสและยอดเงินง่าย */
+h1, h2, h3, .brand-name, .stat-num, .payment .total { font-variant-numeric: lining-nums; }
+h1 { font-size: 1.9rem; }
+h2 { font-size: 1.35rem; }
 h3 { font-size: 1.1rem; }
 p { margin: 0 0 12px; }
 .muted { color: var(--muted); }
 .text-right { text-align: right; }
 .text-center { text-align: center; }
+.nowrap { white-space: nowrap; }
+.hint { font-size: 0.85rem; color: var(--muted); }
+.icon { width: 1.25em; height: 1.25em; flex: none; vertical-align: -0.25em; }
 
 .container { width: min(1160px, 100% - 32px); margin-inline: auto; }
-.page { flex: 1; padding: 32px 0 48px; min-width: 0; }
+.page { flex: 1; padding: 36px 0 64px; min-width: 0; }
 .page-narrow { max-width: 760px; margin-inline: auto; }
-.page-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.page-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
 .page-head h1 { margin: 0; }
-.stack > * + * { margin-top: 20px; }
+.stack > * + * { margin-top: 24px; }
 
-/* ---------- ส่วนหัวและเมนู ---------- */
-.site-header { background: var(--primary); color: #fff; }
-.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 0; }
-.brand { color: #fff; text-decoration: none; font-size: 1.35rem; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: 10px; }
-.brand-tag { font-size: 0.7rem; background: rgba(255, 255, 255, 0.18); padding: 2px 8px; border-radius: 999px; }
-.nav { display: flex; flex-wrap: wrap; gap: 6px; }
+/* หัวข้อมีลายประดับสองข้าง */
+.section-title { display: flex; align-items: center; gap: 14px; justify-content: center; text-align: center; margin: 8px 0 24px; }
+.section-title::before, .section-title::after { content: ""; flex: 0 1 80px; height: 1px; background: linear-gradient(90deg, transparent, var(--rose-soft)); }
+.section-title::after { transform: scaleX(-1); }
+.section-title .icon { color: var(--rose); width: 0.9em; height: 0.9em; }
+
+/* ---------- แถบลายทางด้านบน ---------- */
+.top-strip {
+    background: repeating-linear-gradient(90deg, var(--blush-soft) 0 18px, var(--petal) 18px 36px);
+    color: var(--merlot); font-size: 0.82rem; letter-spacing: 0.3px; text-align: center; padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+/* ---------- ส่วนหัวและเมนู (ขอบล่างหยักเป็นลอนแบบผ้าใบกันสาด) ---------- */
+.site-header { background: var(--merlot); color: #fff; position: relative; margin-bottom: var(--scallop); z-index: 1; }
+.site-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: calc(-1 * var(--scallop)); height: var(--scallop);
+    background: radial-gradient(circle at 50% 0, var(--merlot) calc(var(--scallop) - 0.5px), transparent var(--scallop)) 0 0 / calc(var(--scallop) * 2) var(--scallop) repeat-x;
+}
+.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 14px 0 10px; }
+.brand { color: #fff; text-decoration: none; display: flex; flex-direction: column; line-height: 1.05; }
+.brand-name { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-weight: 500; font-size: 1.6rem; letter-spacing: 0.3px; }
+.brand-sub { font-size: 0.68rem; letter-spacing: 4px; text-transform: uppercase; color: var(--blush); margin-top: 4px; padding-left: 2px; }
+.nav { display: flex; flex-wrap: wrap; gap: 4px; }
 .nav-form { margin: 0; }
 .nav-link {
-    color: #fff; text-decoration: none; font: inherit; font-size: 0.95rem;
+    display: inline-flex; align-items: center; gap: 6px; position: relative;
+    color: #f6e7ea; text-decoration: none; font: inherit; font-size: 0.92rem;
     padding: 7px 14px; border-radius: 999px; border: 0; background: transparent; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
 }
-.nav-link:hover { background: rgba(255, 255, 255, 0.12); }
-.nav-link.active { background: #fff; color: var(--primary); }
+.nav-link:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.nav-link.active { background: var(--blush); color: var(--merlot); }
+.nav-toggle { display: none; }
+.nav-count {
+    min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; background: var(--rose); color: #fff;
+    font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;
+}
 
-.site-footer { background: var(--primary); color: rgba(255, 255, 255, 0.85); text-align: center; padding: 18px 0; font-size: 0.9rem; }
-.footer-note { font-size: 0.8rem; opacity: 0.75; margin-top: 4px; }
+/* ---------- ส่วนท้าย (ขอบบนหยัก) ---------- */
+.site-footer { background: var(--merlot); color: rgba(255, 255, 255, 0.82); position: relative; margin-top: var(--scallop); padding: 28px 0 24px; font-size: 0.85rem; }
+.site-footer::before {
+    content: ""; position: absolute; left: 0; right: 0; top: calc(-1 * var(--scallop)); height: var(--scallop);
+    background: radial-gradient(circle at 50% 100%, var(--merlot) calc(var(--scallop) - 0.5px), transparent var(--scallop)) 0 0 / calc(var(--scallop) * 2) var(--scallop) repeat-x;
+}
+.footer-inner { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+.site-footer .brand-name { color: #fff; font-size: 1.3rem; }
+.footer-tag { color: var(--blush); font-size: 0.82rem; }
+.footer-note { font-size: 0.78rem; opacity: 0.8; text-align: right; max-width: 560px; }
 
 /* ---------- การ์ด ---------- */
-.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; }
 .card > :last-child { margin-bottom: 0; }
 
 /* ---------- ปุ่ม ---------- */
 .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 10px 20px; border-radius: 8px; border: 1px solid transparent;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 22px; border-radius: 999px; border: 1px solid transparent;
     font: inherit; font-size: 0.95rem; font-weight: 500; text-decoration: none; cursor: pointer;
-    background: var(--primary); color: #fff; transition: background 0.2s, transform 0.1s;
+    background: var(--merlot); color: #fff; transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
 }
-.btn:hover { background: var(--primary-dark); }
+.btn:hover { background: var(--merlot-deep); box-shadow: 0 6px 16px rgba(98, 32, 47, 0.22); }
 .btn:active { transform: translateY(1px); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-.btn-success { background: var(--success); }
-.btn-success:hover { background: #1e8e4f; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-success { background: var(--mint-ink); }
+.btn-success:hover { background: #245652; box-shadow: 0 6px 16px rgba(47, 110, 105, 0.25); }
 .btn-danger { background: var(--danger); }
-.btn-danger:hover { background: #c0392b; }
-.btn-outline { background: transparent; color: var(--primary); border-color: var(--primary); }
-.btn-outline:hover { background: var(--primary-soft); }
-.btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+.btn-danger:hover { background: #932c41; box-shadow: 0 6px 16px rgba(176, 56, 79, 0.25); }
+.btn-outline { background: #fff; color: var(--merlot); border-color: var(--rose-soft); }
+.btn-outline:hover { background: var(--blush-soft); border-color: var(--rose); box-shadow: none; }
+.btn-sm { padding: 6px 14px; font-size: 0.85rem; }
 .btn-block { width: 100%; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 20px; }
 .inline-form { display: inline; margin: 0; }
 
 /* ---------- ฟอร์ม ---------- */
-.form-grid { display: grid; gap: 16px; }
+.form-grid { display: grid; gap: 18px; }
 .form-grid.two-cols { grid-template-columns: repeat(2, 1fr); }
-.field label, .field-label { display: block; font-weight: 500; margin-bottom: 6px; color: var(--primary-dark); }
-.field input, .field select, .field textarea {
-    width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
-    border: 1px solid #cfd6dd; border-radius: 8px; background: #fff;
+.field label, .field-label { display: block; font-weight: 500; margin-bottom: 6px; color: var(--plum); font-size: 0.92rem; }
+.field input, .field select, .field textarea,
+.ship-form input, .ship-form select, .inspect-form input, .return-form input {
+    width: 100%; padding: 10px 14px; font: inherit; color: var(--text);
+    border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; transition: border-color 0.2s, box-shadow 0.2s;
 }
-.field input:focus, .field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(52, 73, 94, 0.15); }
-.field input[readonly], .field input:disabled { background: var(--bg); color: var(--muted); }
-.field .hint { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+.field input:focus, .field select:focus, .ship-form input:focus, .ship-form select:focus, .inspect-form input:focus, .return-form input:focus {
+    outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(214, 122, 177, 0.18);
+}
+.field input[readonly], .field input:disabled { background: var(--petal); color: var(--muted); }
+.field input[type="file"] { padding: 8px; }
+.field input[type="file"]::file-selector-button {
+    font: inherit; font-size: 0.88rem; margin-right: 12px; padding: 6px 16px; cursor: pointer;
+    border: 1px solid var(--rose-soft); border-radius: 999px; background: var(--blush-soft); color: var(--merlot);
+}
+.field input[type="file"]::file-selector-button:hover { background: var(--blush); }
+.field .hint { margin-top: 4px; }
 .radio-row { display: flex; gap: 18px; flex-wrap: wrap; }
-.radio-row label { display: flex; align-items: center; gap: 6px; font-weight: 400; white-space: nowrap; }
-.radio-row input { width: auto; margin: 0; }
+.radio-row label { display: flex; align-items: center; gap: 6px; font-weight: 400; white-space: nowrap; color: var(--text); }
+.radio-row input { width: auto; margin: 0; accent-color: var(--merlot); }
 .full { grid-column: 1 / -1; }
 
 /* ---------- ตาราง ---------- */
 .table-wrap { overflow-x: auto; max-width: 100%; }
 .table-wrap .table { min-width: 640px; }
-.table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-.table th { background: var(--primary); color: #fff; font-weight: 500; text-align: left; padding: 12px; white-space: nowrap; }
-.table td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.table tr:hover td { background: #fafbfc; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+.table th { background: var(--blush-soft); color: var(--merlot); font-weight: 500; text-align: left; padding: 11px 12px; white-space: nowrap; border-bottom: 1px solid var(--line); }
+.table th:first-child { border-top-left-radius: var(--radius-sm); }
+.table th:last-child { border-top-right-radius: var(--radius-sm); }
+.table td { padding: 13px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tr:hover td { background: var(--petal); }
 .table .num { text-align: right; white-space: nowrap; }
-.table tfoot td { font-weight: 600; background: var(--primary-soft); }
+.table tfoot td { font-weight: 600; background: var(--blush-soft); color: var(--merlot); border-bottom: 0; }
 
-/* ---------- ข้อความแจ้งเตือนและสถานะ ---------- */
-.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; }
-.alert-success { background: var(--success-soft); color: #1e7a46; }
-.alert-error { background: var(--danger-soft); color: #b03a2e; }
-.alert-info { background: var(--primary-soft); color: var(--primary-dark); }
-.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 500; white-space: nowrap; }
-.badge-pending { background: #fdf2e6; color: var(--warning); }
-.badge-success { background: var(--success-soft); color: var(--success); }
+/* ---------- ข้อความแจ้งเตือนและป้ายสถานะ ---------- */
+.alert { padding: 12px 18px; border-radius: var(--radius-sm); margin-bottom: 20px; font-weight: 500; border: 1px solid transparent; }
+.alert-success { background: var(--mint-soft); color: var(--mint-ink); border-color: #c7e8e5; }
+.alert-error { background: var(--danger-soft); color: var(--danger); border-color: #f3c9d3; }
+.alert-info { background: var(--petal); color: var(--plum); border-color: var(--line); }
+.badge { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 0.8rem; font-weight: 500; white-space: nowrap; }
+.badge-pending { background: #fcebd9; color: var(--warn-ink); }
+.badge-info { background: #f1e6f0; color: var(--plum); }
+.badge-success { background: var(--mint-soft); color: var(--mint-ink); }
 .badge-danger { background: var(--danger-soft); color: var(--danger); }
-.badge-info { background: var(--primary-soft); color: var(--primary-dark); }
+.problem { color: var(--danger); font-size: 0.85rem; margin-top: 4px; }
+.row-problem td { background: var(--danger-soft); }
+
+/* ---------- แถบเดโมและแถบแจ้งเตือนวันคืน ---------- */
+.demo-bar { background: var(--petal); color: var(--plum); border-bottom: 1px dashed var(--rose-soft); font-size: 0.82rem; padding: 7px 0; }
+.demo-bar code { background: #fff; border: 1px solid var(--line); padding: 0 6px; border-radius: 6px; font-size: 0.8rem; color: var(--merlot); }
+.demo-bar a { color: var(--merlot); font-weight: 600; white-space: nowrap; }
+.reminder-bar { background: var(--mint-soft); color: var(--mint-ink); font-size: 0.9rem; padding: 10px 0; }
+.reminder-bar .container { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.reminder-bar.urgent { background: var(--danger-soft); color: var(--danger); }
+.reminder-bar a { color: inherit; font-weight: 600; white-space: nowrap; margin-left: auto; text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---------- รายการข้อมูล (ชื่อ: ค่า) ---------- */
-.info-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; }
-.info-list dt { font-weight: 500; color: var(--muted); }
+.info-list { display: grid; grid-template-columns: max-content 1fr; gap: 10px 28px; margin: 0; }
+.info-list dt { color: var(--muted); }
 .info-list dd { margin: 0; }
 
-/* ---------- หน้าร้าน: ค้นหาและรายการสินค้า ---------- */
-.search { display: flex; max-width: 440px; margin: 0 auto 28px; }
-.search input { flex: 1; padding: 12px 18px; font: inherit; border: 2px solid var(--primary); border-right: 0; border-radius: 999px 0 0 999px; outline: none; }
-.search button { padding: 12px 24px; font: inherit; border: 0; border-radius: 0 999px 999px 0; background: var(--primary); color: #fff; cursor: pointer; }
-.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
-.product-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; text-align: center; display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s; }
-.product-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1); }
-.product-card img { height: 220px; width: 100%; object-fit: contain; margin-bottom: 14px; }
-.product-card h3 { margin: 0 0 4px; }
-.product-card .details { color: var(--muted); font-size: 0.95rem; }
-.product-card .price { font-weight: 600; color: var(--primary-dark); margin-top: auto; }
-.product-card .btn { margin-top: 8px; align-self: center; }
-.product-meta { font-size: 0.8rem; color: var(--muted); }
+/* ---------- หน้าแรก: ส่วนต้อนรับ ---------- */
+.hero {
+    position: relative; border-radius: 24px; overflow: hidden; margin-bottom: 40px; padding: 56px 24px;
+    background: repeating-linear-gradient(90deg, #f9e3ea 0 34px, var(--petal) 34px 68px);
+    border: 1px solid var(--line);
+}
+.hero::before { /* จุดลายโพลกาเล็ก ๆ ทับลายทาง */
+    content: ""; position: absolute; inset: 0; opacity: 0.55;
+    background: radial-gradient(circle, var(--rose-soft) 2px, transparent 2.5px) 0 0 / 34px 34px;
+}
+.hero-card {
+    position: relative; max-width: 620px; margin: 0 auto; text-align: center;
+    background: rgba(255, 253, 248, 0.94); border-radius: 18px; padding: 36px 32px 30px;
+    border: 1px solid var(--line); outline: 1px solid var(--rose-soft); outline-offset: 6px;
+}
+.hero-kicker { font-family: 'Playfair Display', Georgia, serif; font-style: italic; color: var(--rose); font-size: 1.05rem; margin-bottom: 6px; }
+.hero h1 { font-size: 2.1rem; margin-bottom: 10px; }
+.hero p { color: var(--muted); margin-bottom: 22px; }
+.search { display: flex; max-width: 460px; margin: 0 auto; background: #fff; border: 1px solid var(--rose-soft); border-radius: 999px; padding: 4px; }
+.search .icon { color: var(--rose); margin: 0 4px 0 14px; align-self: center; }
+.search input { flex: 1; min-width: 0; padding: 9px 8px; font: inherit; border: 0; outline: none; background: transparent; color: var(--text); }
+.search button { padding: 9px 24px; font: inherit; border: 0; border-radius: 999px; background: var(--merlot); color: #fff; cursor: pointer; }
+.search button:hover { background: var(--merlot-deep); }
 
-.product-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
-.product-detail .photo { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
-.product-detail .photo img { width: 100%; max-height: 420px; object-fit: contain; }
-.product-detail .price { font-size: 1.3rem; font-weight: 600; color: var(--primary-dark); }
-.booked { background: var(--bg); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
-.booked ul { margin: 0; padding-left: 20px; }
+/* ขั้นตอนการเช่า */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 48px; counter-reset: step; }
+.step { text-align: center; padding: 8px 6px; }
+.step-icon {
+    width: 60px; height: 60px; margin: 0 auto 10px; border-radius: 50%; display: grid; place-items: center;
+    background: #fff; color: var(--merlot); border: 1px solid var(--line); box-shadow: 0 0 0 5px var(--blush-soft);
+}
+.step-icon .icon { width: 28px; height: 28px; }
+.step-title { font-weight: 600; color: var(--merlot); }
+.step-title::before { counter-increment: step; content: counter(step) ". "; color: var(--rose); }
+.step .hint { margin: 2px 0 0; }
+
+/* ---------- รายการกระเป๋า ---------- */
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 24px; }
+.product-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 14px 20px;
+    text-align: center; display: flex; flex-direction: column; text-decoration: none; color: inherit;
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+a.product-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+/* กรอบรูปแบบกรอบภาพ: พื้นครีมกับเส้นขอบด้านใน */
+.frame { background: var(--petal); border-radius: 12px; padding: 14px; position: relative; margin-bottom: 14px; }
+.frame::after { content: ""; position: absolute; inset: 6px; border: 1px solid var(--blush); border-radius: 8px; pointer-events: none; }
+.product-card img { height: 200px; width: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.product-card h3 { margin: 0 0 2px; font-size: 1.15rem; }
+.product-card .details { color: var(--muted); font-size: 0.9rem; margin-bottom: 10px; }
+.product-card .price { margin-top: auto; color: var(--merlot); font-weight: 600; margin-bottom: 0; }
+.product-card .price small { color: var(--muted); font-weight: 400; }
+.product-meta { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.5px; }
+
+/* ---------- หน้ารายละเอียดกระเป๋า ---------- */
+.product-detail { display: grid; grid-template-columns: 1.05fr 1fr; gap: 36px; align-items: start; }
+.product-detail .photo { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+.product-detail .photo .frame { margin: 0; padding: 28px; }
+.product-detail .photo img { width: 100%; max-height: 440px; object-fit: contain; mix-blend-mode: multiply; }
+.product-detail h1 { margin-bottom: 4px; }
+.product-detail .price { font-size: 1.4rem; font-weight: 600; color: var(--merlot); margin: 12px 0 18px; }
+.product-detail .price small { font-size: 0.9rem; color: var(--muted); font-weight: 400; }
+.booked { background: var(--petal); border: 1px dashed var(--rose-soft); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 22px; font-size: 0.92rem; }
+.booked ul { margin: 4px 0 0; padding-left: 20px; }
 .booked p { margin: 0; }
-.hint { font-size: 0.85rem; color: var(--muted); }
-.order-card + .order-card { margin-top: 20px; }
-.order-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-.order-head h3 { margin: 0 0 4px; }
-.ship-form { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.ship-form input, .ship-form select { padding: 6px 10px; font: inherit; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 6px; }
-.ship-form input { width: 150px; }
-.row-problem td { background: var(--danger-soft); }
-.problem { color: var(--danger); font-size: 0.85rem; margin-top: 4px; }
+.booked .field-label { margin-bottom: 0; display: flex; align-items: center; gap: 6px; }
+.quote { background: var(--blush-soft); border-radius: var(--radius-sm); padding: 14px 18px; }
+.quote-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.quote-total { border-top: 1px solid var(--blush); margin-top: 6px; padding-top: 10px; font-size: 1.05rem; color: var(--merlot); }
 
 /* ---------- ชำระเงิน ---------- */
 .payment { text-align: center; }
-.payment img { width: 240px; margin: 0 auto 16px; border-radius: 8px; }
-.payment .total { font-size: 1.4rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 16px; }
+.payment img { width: 220px; margin: 0 auto 16px; border-radius: 12px; border: 1px solid var(--line); padding: 8px; background: #fff; }
+.payment .total { font-family: var(--font-head); font-size: 1.6rem; font-weight: 600; color: var(--merlot); margin-bottom: 4px; }
 
-/* ---------- หน้าเข้าสู่ระบบ/สมัครสมาชิก ---------- */
-.auth-card { max-width: 440px; margin: 24px auto; }
-.auth-card.wide { max-width: 600px; }
+/* ---------- เข้าสู่ระบบ / สร้างบัญชี ---------- */
+.auth-card { max-width: 440px; margin: 16px auto; }
+.auth-card.wide { max-width: 620px; }
 .auth-card h1 { text-align: center; }
-.auth-switch { text-align: center; margin-top: 16px; }
+.auth-kicker { text-align: center; font-family: 'Playfair Display', Georgia, serif; font-style: italic; color: var(--rose); margin-bottom: 2px; }
+.auth-switch { text-align: center; margin-top: 18px; color: var(--muted); }
 
-/* ---------- จอเล็ก ---------- */
-@media (max-width: 720px) {
-    .product-detail, .form-grid.two-cols { grid-template-columns: 1fr; }
-    .header-inner { justify-content: center; }
-    .card { padding: 18px; }
-    .info-list { grid-template-columns: 1fr; gap: 2px; }
-    .info-list dd { margin-bottom: 8px; }
-}
+/* ---------- การเช่าของฉัน ---------- */
+.order-card + .order-card { margin-top: 20px; }
+.order-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.order-head h3 { margin: 0 0 2px; }
+.rental-product { display: flex; align-items: center; gap: 12px; }
+.rental-product img { width: 52px; height: 52px; object-fit: contain; flex: none; background: var(--petal); border-radius: 10px; padding: 4px; mix-blend-mode: multiply; }
+.status-cell .hint { margin-top: 4px; max-width: 280px; }
+.return-form { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.return-form input { width: 160px; padding: 6px 12px; font-size: 0.85rem; }
+.empty { text-align: center; padding: 48px 24px; }
+.empty .icon { width: 44px; height: 44px; color: var(--rose); margin-bottom: 8px; }
 
-/* ---------- แถบโหมดเดโม ---------- */
-.demo-bar { background: #fff6e5; color: #7a4b00; border-bottom: 1px solid #f3d9a4; font-size: 0.88rem; padding: 8px 0; }
-.demo-bar code { background: rgba(0, 0, 0, 0.06); padding: 1px 6px; border-radius: 4px; font-size: 0.85rem; }
-.demo-bar a { color: #7a4b00; font-weight: 600; white-space: nowrap; }
-.reminder-bar { background: var(--primary-soft); color: var(--primary-dark); border-bottom: 1px solid var(--border); font-size: 0.92rem; padding: 10px 0; }
-.reminder-bar.urgent { background: var(--danger-soft); color: #b03a2e; }
-.reminder-bar a { color: inherit; font-weight: 600; white-space: nowrap; }
-.status-cell .hint { margin-top: 4px; max-width: 260px; }
-.inspect-form { display: flex; gap: 6px; flex-wrap: wrap; min-width: 340px; }
-.inspect-form input { padding: 6px 10px; font: inherit; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
-.inspect-form input[type="number"] { width: 110px; }
+/* ---------- หลังร้าน ---------- */
+.ship-form, .inspect-form { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ship-form input, .ship-form select, .inspect-form input { width: auto; padding: 6px 12px; font-size: 0.85rem; }
+.ship-form input { width: 150px; }
+.inspect-form { justify-content: flex-start; min-width: 340px; }
+.inspect-form input { min-width: 0; }
+.inspect-form input[type="number"] { width: 120px; }
 .inspect-form input[type="text"] { flex: 1 1 180px; }
 .inspect-actions { display: flex; gap: 6px; justify-content: flex-end; width: 100%; }
-.nowrap { white-space: nowrap; }
-
-/* ---------- ใบเสนอราคาในหน้าสินค้า หน้าการเช่าของฉัน และหน้าภาพรวมแอดมิน ---------- */
-.quote { background: var(--bg); border-radius: 8px; padding: 12px 16px; }
-.quote-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
-.quote-total { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; font-size: 1.05rem; }
-.rental-product { display: flex; align-items: center; gap: 12px; }
-.rental-product img { width: 48px; height: 48px; object-fit: contain; flex: none; }
-.return-form { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.return-form input { padding: 6px 10px; font: inherit; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 6px; width: 150px; }
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.stat-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; text-decoration: none; color: var(--text, inherit); border-top: 4px solid var(--border); }
-.stat-card:hover { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1); }
-.stat-card .stat-num { font-size: 2rem; font-weight: 600; color: var(--primary-dark); line-height: 1.1; }
-.stat-card .stat-label { color: var(--muted); font-size: 0.9rem; }
-.stat-card.todo { border-top-color: var(--warning); }
-.stat-card.urgent { border-top-color: var(--danger); }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.stat-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px;
+    text-decoration: none; color: var(--text); position: relative; overflow: hidden; transition: box-shadow 0.2s, transform 0.2s;
+}
+.stat-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--line); }
+a.stat-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+.stat-card .stat-num { font-family: var(--font-head); font-size: 2rem; font-weight: 600; color: var(--merlot); line-height: 1.15; }
+.stat-card .stat-label { color: var(--muted); font-size: 0.88rem; }
+.stat-card.todo::before { background: var(--rose); }
+.stat-card.urgent::before { background: var(--danger); }
 .stat-card.urgent .stat-num { color: var(--danger); }
-.stat-card.idle { opacity: 0.7; }
+.stat-card.idle { opacity: 0.6; }
+
+/* ---------- จอเล็ก ---------- */
+@media (max-width: 860px) {
+    .steps { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+    .product-detail, .form-grid.two-cols { grid-template-columns: 1fr; }
+
+    /* เมนู 3 ขีด: ปุ่มอยู่ขวาของโลโก้ กดแล้วรายการเมนูเลื่อนลงมาเต็มความกว้าง */
+    .header-inner { flex-wrap: wrap; padding: 12px 0 8px; }
+    .brand-name { font-size: 1.4rem; }
+    .nav-toggle {
+        display: inline-flex; flex-direction: column; justify-content: center; gap: 5px; position: relative;
+        width: 44px; height: 44px; padding: 0 11px; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px;
+        background: transparent; cursor: pointer;
+    }
+    .nav-toggle span { display: block; height: 2px; border-radius: 2px; background: #fff; transition: transform 0.25s, opacity 0.2s; }
+    .nav-toggle.has-badge::after {
+        content: ""; position: absolute; top: 7px; right: 7px; width: 9px; height: 9px; border-radius: 50%;
+        background: var(--rose); box-shadow: 0 0 0 2px var(--merlot);
+    }
+    .nav-open .nav-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-open .nav-toggle span:nth-child(2) { opacity: 0; }
+    .nav-open .nav-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    .nav { display: none; flex-basis: 100%; flex-direction: column; gap: 2px; padding: 6px 0 4px; border-top: 1px solid rgba(255, 255, 255, 0.15); }
+    .nav-open .nav { display: flex; }
+    .nav-form, .nav-form .nav-link { width: 100%; }
+    .nav-link { padding: 11px 14px; border-radius: 12px; font-size: 1rem; justify-content: flex-start; }
+    .nav-link .nav-count { margin-left: auto; }
+
+    /* ตารางเป็นการ์ด: ช่องแรกเป็นหัวการ์ด ช่องอื่นแสดง "ชื่อคอลัมน์ ... ค่า" */
+    .table-wrap .table.is-cards { min-width: 0; }
+    .table.is-cards, .table.is-cards tbody, .table.is-cards tfoot { display: block; }
+    .table.is-cards thead { display: none; }
+    .table.is-cards tr { display: block; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .table.is-cards tbody tr:first-child { padding-top: 4px; }
+    .table.is-cards tbody tr:last-child { border-bottom: 0; }
+    .table.is-cards tr:hover td { background: transparent; }
+    .table.is-cards td {
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;
+        padding: 4px 0; border: 0; text-align: right; white-space: normal;
+    }
+    .table.is-cards td::before { content: attr(data-label); flex: none; max-width: 42%; color: var(--muted); font-size: 0.85rem; text-align: left; padding-top: 1px; }
+    .table.is-cards td[data-label=""] { justify-content: flex-end; }
+    .table.is-cards td[data-label=""]::before { display: none; }
+    .table.is-cards td:first-child { display: block; text-align: left; padding-bottom: 8px; font-weight: 500; }
+    .table.is-cards td:first-child::before { display: none; }
+    .table.is-cards .cell-value { min-width: 0; }
+    .table.is-cards tfoot tr { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 10px 14px; border: 0; border-radius: var(--radius-sm); background: var(--blush-soft); }
+    .table.is-cards tfoot td { display: block; padding: 0; background: none; font-weight: 600; }
+    .table.is-cards tfoot td::before { display: none; }
+    .table.is-cards .status-cell .hint { max-width: none; }
+    .ship-form, .return-form, .inspect-form { justify-content: flex-end; min-width: 0; }
+    .ship-form input, .return-form input { width: 150px; }
+    .inspect-form input[type="text"] { flex-basis: 100%; }
+    .card { padding: 20px; }
+    .hero { padding: 32px 14px; }
+    .hero h1 { font-size: 1.6rem; }
+    .hero-card { padding: 26px 18px; }
+    .info-list { grid-template-columns: 1fr; gap: 2px; }
+    .info-list dd { margin-bottom: 10px; }
+    .footer-inner { justify-content: center; text-align: center; }
+    .order-head .text-right { text-align: left; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 22px; }
+    .stat-card { padding: 14px 16px; }
+    .stat-card .stat-num { font-size: 1.6rem; }
+    .footer-note { text-align: center; }
+    .reminder-bar a { margin-left: 0; }
+}

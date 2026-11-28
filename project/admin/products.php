@@ -21,7 +21,8 @@ page_start('สินค้า', 'admin', 'products');
 </div>
 <?php render_alert(take_flash()); ?>
 
-<form action="products.php" method="GET" class="search">
+<form action="products.php" method="GET" class="search" style="margin-bottom: 28px;">
+    <?php echo icon('search'); ?>
     <input type="text" name="search" placeholder="ค้นหายี่ห้อหรือรุ่น..." value="<?php echo e($search); ?>">
     <button type="submit">ค้นหา</button>
 </form>
@@ -30,11 +31,11 @@ page_start('สินค้า', 'admin', 'products');
     <div class="product-grid">
         <?php foreach ($products as $product): ?>
             <div class="product-card">
-                <img src="<?php echo e(product_image_url($product, '../')); ?>" alt="<?php echo e($product['brand'] . ' ' . $product['details']); ?>" loading="lazy">
+                <div class="frame"><img src="<?php echo e(product_image_url($product, '../')); ?>" alt="<?php echo e($product['brand'] . ' ' . $product['details']); ?>" loading="lazy"></div>
                 <p class="product-meta"><?php echo e($product['product_id']); ?></p>
                 <h3><?php echo e($product['brand']); ?></h3>
                 <p class="details"><?php echo e($product['details']); ?></p>
-                <p class="price"><?php echo baht($product['daily_rental_price']); ?> / วัน</p>
+                <p class="price"><?php echo number_format($product['daily_rental_price']); ?> บาท <small>/ วัน</small></p>
             </div>
         <?php endforeach; ?>
     </div>

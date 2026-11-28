@@ -21,12 +21,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $_SESSION["customers_name"] = $user["customers_firstname"] . " " . $user["customers_lastname"];
         redirect("index.php");
     }
-    $error = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+    $error = "อีเมลหรือรหัสผ่านไม่ถูกต้องค่ะ";
 }
 
 page_start('เข้าสู่ระบบ', 'shop', 'login');
 ?>
 <div class="card auth-card">
+    <div class="auth-kicker">Welcome back</div>
     <h1>เข้าสู่ระบบ</h1>
     <?php render_alert(take_flash()); ?>
     <?php error_alert($error); ?>

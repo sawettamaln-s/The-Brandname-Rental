@@ -17,6 +17,7 @@ function page_start(string $title, string $area = 'shop', string $active = ''): 
 {
     $base = page_base($area);
     $nav = $area === 'admin' ? admin_nav() : shop_nav();
+    $has_badge = (bool) array_filter($nav, fn($item) => !empty($item['count']));
     ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -26,22 +27,34 @@ function page_start(string $title, string $area = 'shop', string $active = ''): 
     <title><?php echo e($title); ?> · <?php echo SHOP_NAME; ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=Noto+Serif+Thai:wght@500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo $base; ?>assets/css/style.css">
 </head>
 <body class="area-<?php echo e($area); ?>">
+<div class="top-strip">
+    <div class="container"><?php echo $area === 'admin' ? 'ระบบหลังร้าน' : 'เช่ารายวัน 1–' . MAX_RENTAL_DAYS . ' วัน · สมาชิกไม่ต้องวางมัดจำ'; ?></div>
+</div>
 <header class="site-header">
     <div class="container header-inner">
-        <a class="brand" href="index.php"><?php echo SHOP_NAME; ?><?php echo $area === 'admin' ? '<span class="brand-tag">ADMIN</span>' : ''; ?></a>
-        <nav class="nav">
+        <a class="brand" href="index.php">
+            <span class="brand-name">The Brandname</span>
+            <span class="brand-sub">Rental<?php echo $area === 'admin' ? ' · Admin' : ''; ?></span>
+        </a>
+        <button type="button" class="nav-toggle<?php echo $has_badge ? ' has-badge' : ''; ?>" aria-expanded="false" aria-controls="site-nav" aria-label="เปิดเมนู">
+            <span></span><span></span><span></span>
+        </button>
+        <nav class="nav" id="site-nav">
             <?php foreach ($nav as $item): ?>
                 <?php if (isset($item['post'])): ?>
                     <form method="POST" action="<?php echo e($item['post']); ?>" class="nav-form">
                         <?php echo csrf_field(); ?>
-                        <button type="submit" class="nav-link"><?php echo e($item['label']); ?></button>
+                        <button type="submit" class="nav-link"><?php echo icon($item['icon']); ?><span><?php echo e($item['label']); ?></span></button>
                     </form>
                 <?php else: ?>
-                    <a class="nav-link<?php echo $item['key'] === $active ? ' active' : ''; ?>" href="<?php echo e($item['href']); ?>"><?php echo e($item['label']); ?></a>
+                    <a class="nav-link<?php echo $item['key'] === $active ? ' active' : ''; ?>" href="<?php echo e($item['href']); ?>">
+                        <?php echo icon($item['icon']); ?><span><?php echo e($item['label']); ?></span>
+                        <?php if (!empty($item['count'])): ?><span class="nav-count"><?php echo (int) $item['count']; ?></span><?php endif; ?>
+                    </a>
                 <?php endif; ?>
             <?php endforeach; ?>
         </nav>
@@ -58,11 +71,49 @@ function page_end(): void
     ?>
 </main>
 <footer class="site-footer">
-    <div class="container">
-        © <?php echo date('Y'); ?> <?php echo SHOP_NAME; ?> · โปรเจกต์วิชาฐานข้อมูล
-        <div class="footer-note">ร้านสมมติเพื่อการศึกษา ไม่ได้เปิดให้เช่าจริง · ภาพและชื่อแบรนด์เป็นของเจ้าของลิขสิทธิ์ ใช้ประกอบการเรียนเท่านั้น</div>
+    <div class="container footer-inner">
+        <div>
+            <div class="brand-name">The Brandname Rental</div>
+            <div class="footer-tag">เช่ากระเป๋าแบรนด์เนมรายวัน</div>
+        </div>
+        <div class="footer-note">
+            © <?php echo date('Y'); ?> · โปรเจกต์วิชาฐานข้อมูล ร้านสมมติเพื่อการศึกษา ไม่ได้เปิดให้เช่าจริง<br>
+            ภาพและชื่อแบรนด์เป็นของเจ้าของลิขสิทธิ์ ใช้ประกอบการเรียนเท่านั้น
+        </div>
     </div>
 </footer>
+<script>
+// เมนู 3 ขีดบนจอเล็ก: กดเพื่อเปิด/ปิดรายการเมนู
+(function () {
+    const header = document.querySelector('.site-header');
+    const toggle = header.querySelector('.nav-toggle');
+    toggle.addEventListener('click', function () {
+        const open = header.classList.toggle('nav-open');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.setAttribute('aria-label', open ? 'ปิดเมนู' : 'เปิดเมนู');
+    });
+})();
+
+// ตารางบนจอเล็กแสดงเป็นการ์ด: ใส่ชื่อคอลัมน์ให้แต่ละช่อง (data-label) และห่อเนื้อหาในช่องไว้ใน div เดียว
+// CSS จะเปลี่ยนรูปแบบเฉพาะตารางที่มีคลาส is-cards ถ้า JavaScript ไม่ทำงาน ตารางยังเลื่อนซ้ายขวาได้ตามเดิม
+document.querySelectorAll('table.table').forEach(function (table) {
+    const labels = Array.from(table.querySelectorAll('thead th')).map((th) => th.textContent.trim());
+    table.querySelectorAll('tbody tr, tfoot tr').forEach(function (row) {
+        let col = 0;
+        Array.from(row.children).forEach(function (cell) {
+            if (row.parentElement.tagName === 'TBODY') {
+                cell.dataset.label = labels[col] || '';
+            }
+            col += cell.colSpan || 1;
+            const value = document.createElement('div');
+            value.className = 'cell-value';
+            while (cell.firstChild) value.appendChild(cell.firstChild);
+            cell.appendChild(value);
+        });
+    });
+    table.classList.add('is-cards');
+});
+</script>
 </body>
 </html>
     <?php
@@ -70,16 +121,15 @@ function page_end(): void
 
 function shop_nav(): array
 {
-    $items = [['key' => 'home', 'label' => 'สินค้า', 'href' => 'index.php']];
+    $items = [['key' => 'home', 'label' => 'กระเป๋า', 'href' => 'index.php', 'icon' => 'store']];
     if (!empty($_SESSION['customers_id'])) {
-        $count = cart_count();
-        $items[] = ['key' => 'cart', 'label' => 'ตะกร้า' . ($count ? " ($count)" : ''), 'href' => 'cart.php'];
-        $items[] = ['key' => 'rentals', 'label' => 'การเช่าของฉัน', 'href' => 'rentals.php'];
-        $items[] = ['key' => 'profile', 'label' => 'โปรไฟล์', 'href' => 'profile.php'];
-        $items[] = ['key' => 'logout', 'label' => 'ออกจากระบบ', 'post' => 'logout.php'];
+        $items[] = ['key' => 'cart', 'label' => 'ตะกร้า', 'href' => 'cart.php', 'icon' => 'cart', 'count' => cart_count()];
+        $items[] = ['key' => 'rentals', 'label' => 'การเช่าของฉัน', 'href' => 'rentals.php', 'icon' => 'bag'];
+        $items[] = ['key' => 'profile', 'label' => 'บัญชี', 'href' => 'profile.php', 'icon' => 'user'];
+        $items[] = ['key' => 'logout', 'label' => 'ออกจากระบบ', 'post' => 'logout.php', 'icon' => 'logout'];
     } else {
-        $items[] = ['key' => 'login', 'label' => 'เข้าสู่ระบบ', 'href' => 'login.php'];
-        $items[] = ['key' => 'register', 'label' => 'สร้างบัญชี', 'href' => 'register.php'];
+        $items[] = ['key' => 'login', 'label' => 'เข้าสู่ระบบ', 'href' => 'login.php', 'icon' => 'user'];
+        $items[] = ['key' => 'register', 'label' => 'สร้างบัญชี', 'href' => 'register.php', 'icon' => 'heart'];
     }
     return $items;
 }
@@ -87,16 +137,16 @@ function shop_nav(): array
 function admin_nav(): array
 {
     if (empty($_SESSION['admin_id'])) {
-        return [['key' => 'shop', 'label' => 'กลับหน้าร้าน', 'href' => '../index.php']];
+        return [['key' => 'shop', 'label' => 'กลับหน้าร้าน', 'href' => '../index.php', 'icon' => 'store']];
     }
     return [
-        ['key' => 'dashboard', 'label' => 'ภาพรวม', 'href' => 'index.php'],
-        ['key' => 'products', 'label' => 'สินค้า', 'href' => 'products.php'],
-        ['key' => 'orders', 'label' => 'คำสั่งเช่า', 'href' => 'orders.php'],
-        ['key' => 'returns', 'label' => 'การคืน', 'href' => 'returns.php'],
-        ['key' => 'members', 'label' => 'อนุมัติสมาชิก', 'href' => 'members.php'],
-        ['key' => 'employees', 'label' => 'พนักงาน', 'href' => 'employees.php'],
-        ['key' => 'logout', 'label' => 'ออกจากระบบ', 'post' => 'logout.php'],
+        ['key' => 'dashboard', 'label' => 'ภาพรวม', 'href' => 'index.php', 'icon' => 'grid'],
+        ['key' => 'products', 'label' => 'สินค้า', 'href' => 'products.php', 'icon' => 'tag'],
+        ['key' => 'orders', 'label' => 'คำสั่งเช่า', 'href' => 'orders.php', 'icon' => 'truck'],
+        ['key' => 'returns', 'label' => 'การคืน', 'href' => 'returns.php', 'icon' => 'box-heart'],
+        ['key' => 'members', 'label' => 'สมาชิก', 'href' => 'members.php', 'icon' => 'card'],
+        ['key' => 'employees', 'label' => 'พนักงาน', 'href' => 'employees.php', 'icon' => 'people'],
+        ['key' => 'logout', 'label' => 'ออกจากระบบ', 'post' => 'logout.php', 'icon' => 'logout'],
     ];
 }
 
@@ -113,9 +163,8 @@ function reminder_banner(): void
     }
     $urgent = (bool) array_filter($reminders, fn($r) => $r['urgent']);
     echo '<div class="reminder-bar' . ($urgent ? ' urgent' : '') . '"><div class="container">';
-    echo '<strong>แจ้งเตือนวันคืน</strong> ';
-    echo implode(' · ', array_map(fn($r) => e($r['text']), $reminders));
-    echo ' · <a href="rentals.php#return-form">แจ้งเลขพัสดุส่งคืน</a>';
+    echo icon('calendar') . ' <span>' . implode(' · ', array_map(fn($r) => e($r['text']), $reminders)) . '</span>';
+    echo ' <a href="rentals.php#return-form">แจ้งส่งคืน</a>';
     echo '</div></div>';
 }
 

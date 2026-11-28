@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$already_member && !$pending) {
         $stmt->bind_param("ss", $customer_id, $saved['file']);
         $stmt->execute();
         $stmt->close();
-        flash("ส่งสลิปสมัครสมาชิกแล้ว ร้านจะตรวจสอบและอนุมัติให้ค่ะ");
+        flash("ได้รับสลิปแล้ว ร้านจะตรวจและเปิดสิทธิ์สมาชิกให้เร็ว ๆ นี้ค่ะ");
         redirect("profile.php");
     }
 }
@@ -38,30 +38,30 @@ page_start('สมัครสมาชิก', 'shop', 'profile');
 ?>
 <div class="page-narrow">
     <div class="card payment">
-        <h1>สมัครสมาชิก 1 ปี</h1>
-        <p>ค่าสมัคร <?php echo number_format(MEMBER_FEE); ?> บาท · สมาชิกเช่ากระเป๋าได้โดยไม่ต้องวางมัดจำ (ปกติ <?php echo number_format(DEPOSIT_FEE); ?> บาทต่อใบ)</p>
-        <p class="muted">อายุสมาชิก 1 ปีนับจากวันที่ร้านอนุมัติ</p>
+        <div class="auth-kicker">Member</div>
+        <h1>สมัครสมาชิก</h1>
+        <p class="muted">เช่าได้ทุกใบโดยไม่ต้องวางมัดจำ <?php echo number_format(DEPOSIT_FEE); ?> บาท · อายุ 1 ปีนับจากวันที่ร้านอนุมัติ</p>
 
         <?php if ($already_member): ?>
-            <div class="alert alert-success">คุณเป็นสมาชิกอยู่แล้ว<?php echo $user['member_until'] ? ' (ถึง ' . e(thai_date($user['member_until'])) . ')' : ''; ?></div>
+            <div class="alert alert-success">คุณเป็นสมาชิกอยู่แล้วค่ะ<?php echo $user['member_until'] ? ' (ถึง ' . e(thai_date($user['member_until'])) . ')' : ''; ?></div>
         <?php elseif ($pending): ?>
-            <div class="alert alert-info">ส่งสลิปแล้ว รอร้านตรวจสอบและอนุมัติค่ะ</div>
+            <div class="alert alert-info">ได้รับสลิปแล้ว ร้านจะตรวจและเปิดสิทธิ์ให้เร็ว ๆ นี้ค่ะ</div>
         <?php else: ?>
             <img src="assets/images/qrcode.png" alt="QR Code สำหรับการชำระเงิน">
-            <div class="total">ยอดชำระ <?php echo baht(MEMBER_FEE); ?></div>
+            <div class="total" style="margin-bottom: 16px;"><?php echo baht(MEMBER_FEE); ?></div>
             <?php error_alert($upload_error); ?>
             <form action="member.php" method="post" enctype="multipart/form-data" class="form-grid" style="text-align: left;">
                 <?php echo csrf_field(); ?>
                 <div class="field">
                     <label for="payment_slip">แนบสลิปการโอน</label>
                     <input type="file" id="payment_slip" name="payment_slip" accept="image/jpeg,image/png,image/webp" required>
-                    <div class="hint">ไฟล์ JPG, PNG หรือ WEBP ไม่เกิน 2 MB</div>
+                    <div class="hint">JPG, PNG หรือ WEBP ไม่เกิน 2 MB</div>
                 </div>
-                <button type="submit" class="btn btn-success btn-block">ส่งสลิปเพื่อสมัครสมาชิก</button>
+                <button type="submit" class="btn btn-block">ส่งสลิป</button>
             </form>
         <?php endif; ?>
         <div class="actions" style="justify-content: center;">
-            <a href="profile.php" class="btn btn-outline">กลับไปโปรไฟล์</a>
+            <a href="profile.php" class="btn btn-outline">กลับไปบัญชีของฉัน</a>
         </div>
     </div>
 </div>

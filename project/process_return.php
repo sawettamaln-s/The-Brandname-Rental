@@ -11,7 +11,7 @@ $rental_id = input('rental_id');
 $track_return = strtoupper(input('track_return'));
 
 if (!preg_match('/^[A-Z0-9&\-]{8,50}$/', $track_return)) {
-    flash("เลขพัสดุไม่ถูกต้อง (ตัวอักษรภาษาอังกฤษหรือตัวเลข 8–50 ตัว)", "error");
+    flash("เลขพัสดุต้องเป็นตัวอักษรภาษาอังกฤษหรือตัวเลข 8–50 ตัวค่ะ", "error");
     redirect("rentals.php");
 }
 
@@ -24,7 +24,7 @@ $allowed = $stmt->get_result()->num_rows === 1;
 $stmt->close();
 
 if (!$allowed) {
-    flash("ไม่สามารถแจ้งคืนรายการนี้ได้", "error");
+    flash("รายการนี้แจ้งส่งคืนไม่ได้ค่ะ", "error");
     redirect("rentals.php");
 }
 
@@ -45,11 +45,11 @@ try {
     $stmt->close();
 
     $conn->commit();
-    flash("บันทึกการส่งคืนแล้ว ร้านจะตรวจสภาพสินค้าเมื่อได้รับของค่ะ");
+    flash("บันทึกการส่งคืนแล้วค่ะ ร้านจะตรวจสภาพเมื่อได้รับกระเป๋านะคะ");
 } catch (mysqli_sql_exception $e) {
     $conn->rollback();
     // 1062 = ข้อมูลซ้ำ เลขพัสดุเป็น primary key ของตาราง track_return
-    flash($e->getCode() === 1062 ? "เลขพัสดุนี้ถูกใช้แจ้งคืนไปแล้ว" : "บันทึกการคืนสินค้าไม่สำเร็จ กรุณาลองใหม่", "error");
+    flash($e->getCode() === 1062 ? "เลขพัสดุนี้ถูกใช้แจ้งคืนไปแล้วค่ะ" : "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้งค่ะ", "error");
     if ($e->getCode() !== 1062) {
         error_log('process_return failed: ' . $e->getMessage());
     }

@@ -56,7 +56,7 @@ $requests = $conn->query("SELECT m.request_id, m.customers_id, m.created_at, c.c
 page_start('อนุมัติสมาชิก', 'admin', 'members');
 ?>
 <h1>คำขอสมัครสมาชิก</h1>
-<p class="muted">เปิดดูสลิปและตรวจยอดโอน <?php echo number_format(MEMBER_FEE); ?> บาท ก่อนกดอนุมัติ สมาชิกมีอายุ 1 ปีนับจากวันที่อนุมัติ</p>
+<p class="muted">ค่าสมัคร <?php echo number_format(MEMBER_FEE); ?> บาท · อายุ 1 ปีนับจากวันที่อนุมัติ</p>
 <?php render_alert(take_flash()); ?>
 
 <div class="card table-wrap">

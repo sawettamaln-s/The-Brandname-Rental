@@ -120,7 +120,7 @@ function demo_banner(string $base): void
         $parts[] = e($account['role']) . ' <code>' . e($account['user']) . '</code> / <code>' . e($account['pass']) . '</code>';
     }
     echo '<div class="demo-bar"><div class="container">'
-        . '<strong>เว็บเดโม</strong> ข้อมูลรีเซ็ตทุกวัน · ลองใช้บัญชี: ' . implode(' · ', $parts)
-        . ' · <a href="' . e($base) . 'admin/login.php">หลังบ้าน</a>'
+        . '<strong>เว็บเดโม</strong> ข้อมูลรีเซ็ตทุกวัน · ' . implode(' · ', $parts)
+        . ' · <a href="' . e($base) . 'admin/login.php">หลังร้าน</a>'
         . '</div></div>';
 }

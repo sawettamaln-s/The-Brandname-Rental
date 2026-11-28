@@ -275,6 +275,14 @@ return [
 6. คัดลอก `htdocs/includes/config.local.example.php` เป็น `config.local.php` แล้วใส่ค่าฐานข้อมูลจากข้อ 3
 7. เปิดเว็บ ทดลองเข้าสู่ระบบด้วยบัญชีทดลองบนแถบเดโม
 
+## ดีไซน์
+
+- โทนสีไวน์แดง (merlot) ชมพูกุหลาบ ชมพูพีช ครีม และมิ้นต์ ตั้งไว้เป็นตัวแปรที่ `:root` ใน `assets/css/style.css`
+- ลายทาง จุดโพลกา และขอบหยักแบบผ้าใบกันสาด ทำด้วย CSS ล้วน ไม่ใช้ไฟล์รูป
+- ไอคอนเป็น SVG ที่วาดขึ้นเองสำหรับเว็บนี้ (`includes/icons.php`)
+- ฟอนต์ Noto Serif Thai (หัวข้อ) IBM Plex Sans Thai (เนื้อหา) และ Playfair Display (โลโก้) จาก Google Fonts สัญญาอนุญาต OFL
+- ข้อความถึงลูกค้าใช้ภาษาสุภาพ เรียกลูกค้าว่า "คุณ"
+
 ## เทคโนโลยี
 
 PHP 8 (mysqli) · MySQL/MariaDB · HTML/CSS · Apache (.htaccess)

@@ -103,7 +103,6 @@ page_start('การคืนสินค้า', 'admin', 'returns');
 <div class="stack">
     <section class="card">
         <h2>1. กำลังส่งคืน (<?php echo count($incoming); ?>)</h2>
-        <p class="muted">ลูกค้าแจ้งเลขพัสดุส่งคืนแล้ว เมื่อของถึงร้านให้กด "ได้รับของแล้ว" ระบบบันทึกวันนี้เป็นวันที่ได้รับของ</p>
         <?php if ($incoming): ?>
             <div class="table-wrap">
                 <table class="table">
@@ -144,7 +143,7 @@ page_start('การคืนสินค้า', 'admin', 'returns');
 
     <section class="card">
         <h2>2. ตรวจสภาพ (<?php echo count($to_inspect); ?>)</h2>
-        <p class="muted">สภาพดีกด "คืนมัดจำเต็ม" ถ้าเสียหาย กรอกค่าเสียหายและหมายเหตุว่าเสียหายอะไร แล้วกด "หักมัดจำ" ระบบหักจากมัดจำก่อน ส่วนที่เกินมัดจำ ลูกค้าจะเห็นว่าต้องชำระเพิ่ม (ร้านติดต่อเรียกเก็บเอง)</p>
+        <p class="muted">ค่าเสียหายหักจากมัดจำก่อน ส่วนที่เกินลูกค้าต้องชำระเพิ่ม</p>
         <?php if ($to_inspect): ?>
             <div class="table-wrap">
                 <table class="table">

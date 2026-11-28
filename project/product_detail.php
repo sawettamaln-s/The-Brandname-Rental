@@ -11,7 +11,7 @@ $stmt->close();
 
 if (!$product) {
     http_response_code(404);
-    die("ไม่พบข้อมูลสินค้า");
+    die("ไม่พบกระเป๋าใบนี้ค่ะ");
 }
 
 $error = '';
@@ -24,9 +24,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $date = DateTime::createFromFormat('!Y-m-d', $rental_date);
 
     if ($days === false) {
-        $error = "จำนวนวันเช่าต้องอยู่ระหว่าง 1 – " . MAX_RENTAL_DAYS . " วัน";
+        $error = "เช่าได้ 1–" . MAX_RENTAL_DAYS . " วันค่ะ";
     } elseif (!$date || $date->format('Y-m-d') !== $rental_date || $rental_date < $today) {
-        $error = "กรุณาเลือกวันที่เช่าตั้งแต่วันนี้เป็นต้นไป";
+        $error = "กรุณาเลือกวันเริ่มเช่าตั้งแต่วันนี้เป็นต้นไปค่ะ";
     } elseif ($conflicts = booking_conflicts($conn, $product['product_id'], $rental_date, $days)) {
         $error = conflict_message($conflicts);
     } else {
@@ -46,23 +46,21 @@ $booked = booked_ranges($conn, $product['product_id']);
 // มัดจำของผู้ที่กำลังดู: ลูกค้าที่ล็อกอินคิดตามสถานะสมาชิก ผู้ที่ยังไม่ล็อกอินแสดงมัดจำของลูกค้าทั่วไป
 $viewer = !empty($_SESSION['customers_id']) ? find_customer($conn, $_SESSION['customers_id']) : null;
 $deposit = $viewer ? deposit_for($viewer) : DEPOSIT_FEE;
-$deposit_note = $viewer ? (is_member($viewer) ? 'สมาชิกไม่ต้องวางมัดจำ' : 'มัดจำได้คืนเมื่อคืนกระเป๋าสภาพดี') : 'ถ้าเป็นสมาชิก ไม่ต้องวางมัดจำ';
+$deposit_note = $viewer && is_member($viewer) ? 'คุณเป็นสมาชิก ไม่ต้องวางมัดจำค่ะ' : 'ได้รับมัดจำคืนเต็มจำนวนเมื่อคืนกระเป๋าในสภาพดีค่ะ';
 
 page_start($product['brand'] . ' ' . $product['details'], 'shop', 'home');
 ?>
 <div class="product-detail">
     <div class="photo">
-        <img src="<?php echo e(product_image_url($product)); ?>" alt="<?php echo e($product['brand'] . ' ' . $product['details']); ?>">
+        <div class="frame"><img src="<?php echo e(product_image_url($product)); ?>" alt="<?php echo e($product['brand'] . ' ' . $product['details']); ?>"></div>
     </div>
     <div class="card">
-        <p class="product-meta">รหัสสินค้า <?php echo e($product['product_id']); ?></p>
         <h1><?php echo e($product['brand']); ?></h1>
         <p><?php echo e($product['details']); ?></p>
-        <p class="price"><?php echo baht($product['daily_rental_price']); ?> / วัน</p>
-        <p class="muted">ค่ามัดจำ <?php echo number_format(DEPOSIT_FEE); ?> บาทต่อใบ (สมาชิกไม่ต้องวางมัดจำ)</p>
+        <p class="price"><?php echo number_format($product['daily_rental_price']); ?> บาท <small>/ วัน</small></p>
 
         <div class="booked">
-            <span class="field-label">ช่วงที่ไม่ว่าง</span>
+            <span class="field-label"><?php echo icon('calendar'); ?>ช่วงที่ไม่ว่าง</span>
             <?php if ($booked): ?>
                 <ul>
                     <?php foreach ($booked as $range): ?>
@@ -70,9 +68,9 @@ page_start($product['brand'] . ' ' . $product['details'], 'shop', 'home');
                     <?php endforeach; ?>
                 </ul>
             <?php else: ?>
-                <p class="muted">ว่างทุกวัน</p>
+                <p class="muted">ว่างทุกวันค่ะ</p>
             <?php endif; ?>
-            <div class="hint">รวมวันพัก <?php echo TURNAROUND_DAYS; ?> วันหลังกำหนดคืน สำหรับขนส่งขากลับและทำความสะอาด</div>
+            <div class="hint">รวมวันขนส่งและทำความสะอาดหลังคืน <?php echo TURNAROUND_DAYS; ?> วัน</div>
         </div>
 
         <?php error_alert($error); ?>
@@ -94,10 +92,10 @@ page_start($product['brand'] . ' ' . $product['details'], 'shop', 'home');
                 <div class="quote-row"><span>ค่ามัดจำ</span><span><?php echo baht($deposit); ?></span></div>
                 <div class="quote-row quote-total"><span>รวมที่ต้องโอน</span><strong id="quote-total"><?php echo baht($product['daily_rental_price'] + $deposit); ?></strong></div>
                 <div class="hint"><?php echo e($deposit_note); ?></div>
-                <div class="problem" id="quote-conflict" hidden>ช่วงนี้กระเป๋าไม่ว่าง กรุณาเลือกวันอื่น</div>
+                <div class="problem" id="quote-conflict" hidden>ช่วงนี้กระเป๋าไม่ว่าง กรุณาเลือกวันอื่นนะคะ</div>
             </div>
             <div class="full actions">
-                <button type="submit" class="btn">เพิ่มลงตะกร้า</button>
+                <button type="submit" class="btn"><?php echo icon('cart'); ?>เพิ่มลงตะกร้า</button>
                 <a href="index.php" class="btn btn-outline">ย้อนกลับ</a>
             </div>
         </form>

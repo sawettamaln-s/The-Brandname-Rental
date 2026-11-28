@@ -2,13 +2,11 @@
 require_once 'includes/db.php';
 
 $error = "";
-$genders = ['Male' => 'ชาย', 'Female' => 'หญิง', 'Other' => 'อื่น ๆ'];
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     verify_csrf();
     $firstname = input('firstname');
     $lastname = input('lastname');
-    $gender = input('gender');
     $email = input('email');
     $phonenumber = input('phonenumber');
     $address = input('address');
@@ -16,17 +14,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $password = input('password', false);
 
     if ($firstname === '' || $lastname === '' || $address === '') {
-        $error = "กรุณากรอกข้อมูลให้ครบ";
-    } elseif (!isset($genders[$gender])) {
-        $error = "กรุณาเลือกเพศ";
+        $error = "กรุณากรอกข้อมูลให้ครบค่ะ";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "รูปแบบอีเมลไม่ถูกต้อง";
+        $error = "รูปแบบอีเมลไม่ถูกต้องค่ะ";
     } elseif (strlen($password) < 8) {
-        $error = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+        $error = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษรค่ะ";
     } elseif (!preg_match('/^[0-9\-+ ]{9,15}$/', $phonenumber)) {
-        $error = "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง";
+        $error = "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้องค่ะ";
     } elseif (!preg_match('/^[0-9]{5}$/', $postal_code)) {
-        $error = "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก";
+        $error = "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลักค่ะ";
     } else {
         $stmt = $conn->prepare("SELECT 1 FROM customers WHERE email = ?");
         $stmt->bind_param("s", $email);
@@ -35,19 +31,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt->close();
 
         if ($exists) {
-            $error = "อีเมลนี้มีในระบบแล้ว";
+            $error = "อีเมลนี้มีบัญชีอยู่แล้วค่ะ";
         } else {
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             $new_id = next_id($conn, 'customers', 'customers_id', 'C', 3);
             $customers_member = 'no';
 
             $stmt = $conn->prepare("INSERT INTO customers (customers_id, customers_firstname, customers_lastname,
-            gender, customers_member, email, phonenumber, address, postal_code, password)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssssssssss", $new_id, $firstname, $lastname, $gender, $customers_member, $email, $phonenumber, $address, $postal_code, $hashed_password);
+            customers_member, email, phonenumber, address, postal_code, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("sssssssss", $new_id, $firstname, $lastname, $customers_member, $email, $phonenumber, $address, $postal_code, $hashed_password);
             $stmt->execute();
             $stmt->close();
-            flash("สร้างบัญชีสำเร็จ เข้าสู่ระบบได้เลยค่ะ");
+            flash("สร้างบัญชีเรียบร้อยแล้ว เข้าสู่ระบบได้เลยค่ะ");
             redirect("login.php");
         }
     }
@@ -57,7 +53,8 @@ $old = fn($key) => e(input($key));
 page_start('สร้างบัญชี', 'shop', 'register');
 ?>
 <div class="card auth-card wide">
-    <h1>สร้างบัญชีใหม่</h1>
+    <div class="auth-kicker">Welcome</div>
+    <h1>สร้างบัญชี</h1>
     <?php error_alert($error); ?>
     <form method="POST" class="form-grid two-cols">
         <?php echo csrf_field(); ?>
@@ -68,14 +65,6 @@ page_start('สร้างบัญชี', 'shop', 'register');
         <div class="field">
             <label for="lastname">นามสกุล</label>
             <input type="text" name="lastname" id="lastname" maxlength="50" value="<?php echo $old('lastname'); ?>" required>
-        </div>
-        <div class="field full">
-            <span class="field-label">เพศ</span>
-            <div class="radio-row">
-                <?php foreach ($genders as $value => $label): ?>
-                    <label><input type="radio" name="gender" value="<?php echo $value; ?>" <?php echo input('gender') === $value ? 'checked' : ''; ?> required> <?php echo $label; ?></label>
-                <?php endforeach; ?>
-            </div>
         </div>
         <div class="field">
             <label for="email">อีเมล</label>
@@ -95,7 +84,7 @@ page_start('สร้างบัญชี', 'shop', 'register');
             <input type="text" name="postal_code" id="postal_code" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" value="<?php echo $old('postal_code'); ?>" required>
         </div>
         <div class="field full">
-            <label for="address">ที่อยู่สำหรับจัดส่ง</label>
+            <label for="address">ที่อยู่จัดส่ง</label>
             <input type="text" name="address" id="address" maxlength="200" value="<?php echo $old('address'); ?>" required>
         </div>
         <button type="submit" class="btn btn-block full">สร้างบัญชี</button>

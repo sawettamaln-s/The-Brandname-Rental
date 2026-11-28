@@ -77,7 +77,7 @@ function verify_csrf(): void
     $sent = $_POST['csrf_token'] ?? '';
     if (!is_string($sent) || !hash_equals(csrf_token(), $sent)) {
         http_response_code(400);
-        die('คำขอไม่ถูกต้อง กรุณากลับไปหน้าเดิมแล้วลองใหม่');
+        die('หน้านี้หมดอายุแล้ว กรุณากลับไปหน้าเดิมแล้วลองใหม่อีกครั้งค่ะ');
     }
 }
 
@@ -144,7 +144,7 @@ function current_customer(mysqli $conn): array
     if (!$customer) {
         $_SESSION = [];
         session_regenerate_id(true);
-        flash('ไม่พบบัญชีของคุณแล้ว กรุณาเข้าสู่ระบบใหม่', 'error');
+        flash('ไม่พบบัญชีของคุณ กรุณาเข้าสู่ระบบอีกครั้งค่ะ', 'error');
         redirect('login.php');
     }
     return $customer;
@@ -178,7 +178,7 @@ const RENTAL_STATUS = [
     'Shipped'   => ['จัดส่งแล้ว', 'info'],
     'OnRent'    => ['อยู่ระหว่างเช่า', 'info'],
     'Returning' => ['กำลังส่งคืน', 'pending'],
-    'Received'  => ['ร้านได้รับของ รอตรวจสภาพ', 'pending'],
+    'Received'  => ['ร้านได้รับกระเป๋าแล้ว', 'pending'],
     'Completed' => ['เสร็จสมบูรณ์', 'success'],
     'Deducted'  => ['หักมัดจำ', 'danger'],
     'Cancelled' => ['ยกเลิก', 'danger'],
@@ -211,17 +211,17 @@ function status_hint(array $rental): string
     $deposit = (int) $rental['deposit_fee'];
     $deduction = (int) ($rental['deduction'] ?? 0);
     return match (rental_stage($rental)) {
-        'Pending' => 'ร้านกำลังตรวจสลิป',
-        'Accepted' => 'ร้านรับเรื่องแล้ว จะจัดส่งให้ถึงก่อนวันเริ่มเช่า',
-        'Preparing' => 'ร้านกำลังเตรียมกระเป๋าเพื่อจัดส่ง',
-        'Shipped' => 'จัดส่งแล้ว เลขพัสดุ ' . ($rental['track_rentals'] ?? '-'),
-        'OnRent' => is_overdue($rental) ? 'กรุณาส่งคืนและแจ้งเลขพัสดุโดยเร็ว' : 'ส่งคืนภายใน ' . thai_date($rental['due_date']),
-        'Returning' => 'รอร้านได้รับของ เลขพัสดุคืน ' . ($rental['track_return'] ?? '-'),
-        'Received' => 'ร้านได้รับของแล้ว กำลังตรวจสภาพเพื่อพิจารณามัดจำ',
-        'Completed' => $deposit > 0 ? 'คืนมัดจำเต็ม ' . baht($deposit) : 'คืนกระเป๋าเรียบร้อย',
+        'Pending' => 'ร้านกำลังตรวจสลิปค่ะ',
+        'Accepted' => 'ร้านจะจัดส่งให้ถึงก่อนวันเริ่มเช่าค่ะ',
+        'Preparing' => 'ร้านกำลังเตรียมกระเป๋าให้คุณค่ะ',
+        'Shipped' => 'เลขพัสดุ ' . ($rental['track_rentals'] ?? '-'),
+        'OnRent' => is_overdue($rental) ? 'เลยกำหนดคืนแล้ว รบกวนส่งคืนและแจ้งเลขพัสดุนะคะ' : '',  // วันคืนแสดงในคอลัมน์ช่วงเช่าแล้ว
+        'Returning' => 'เลขพัสดุคืน ' . ($rental['track_return'] ?? '-'),
+        'Received' => 'กำลังตรวจสภาพก่อนคืนมัดจำค่ะ',
+        'Completed' => $deposit > 0 ? 'คืนมัดจำเต็ม ' . baht($deposit) . ' ขอบคุณค่ะ' : 'คืนกระเป๋าเรียบร้อย ขอบคุณค่ะ',
         'Deducted' => 'ค่าเสียหาย ' . baht($deduction) . ($rental['deduction_note'] ? ': ' . $rental['deduction_note'] : '')
-            . (extra_charge($rental) > 0 ? ' · ต้องชำระเพิ่ม ' . baht(extra_charge($rental)) . ' กรุณาติดต่อร้าน' : ''),
-        'Cancelled' => ($rental['cancelled_by'] ?? '') === 'customer' ? 'คุณยกเลิกคำสั่งนี้แล้ว' : 'ร้านปฏิเสธสลิป หากโอนเงินแล้วกรุณาติดต่อร้าน',
+            . (extra_charge($rental) > 0 ? ' · ชำระเพิ่ม ' . baht(extra_charge($rental)) . ' ร้านจะติดต่อคุณค่ะ' : ''),
+        'Cancelled' => ($rental['cancelled_by'] ?? '') === 'customer' ? 'คุณยกเลิกคำสั่งนี้แล้วค่ะ' : 'ร้านยืนยันสลิปไม่ได้ หากโอนเงินแล้วกรุณาติดต่อร้านค่ะ',
         default => '',
     };
 }
@@ -271,7 +271,7 @@ function due_reminders(mysqli $conn, string $customer_id): array
         $reminders[] = match (true) {
             $days_left === 1 => ['text' => "พรุ่งนี้ครบกำหนดคืน $bag", 'urgent' => false],
             $days_left === 0 => ['text' => "วันนี้ครบกำหนดคืน $bag", 'urgent' => false],
-            default => ['text' => "เกินกำหนดคืน " . -$days_left . " วัน: $bag", 'urgent' => true],
+            default => ['text' => "เลยกำหนดคืน " . -$days_left . " วัน $bag", 'urgent' => true],
         };
     }
     return $reminders;
@@ -342,7 +342,7 @@ function booked_ranges(mysqli $conn, string $product_id): array
 function conflict_message(array $conflicts): string
 {
     $ranges = array_map(fn($c) => thai_date($c['rental_date']) . ' ถึง ' . thai_date($c['busy_until']), $conflicts);
-    return 'กระเป๋าใบนี้ไม่ว่างช่วง ' . implode(', ', $ranges) . ' กรุณาเลือกวันอื่น';
+    return 'กระเป๋าใบนี้ไม่ว่างช่วง ' . implode(', ', $ranges) . ' กรุณาเลือกวันอื่นนะคะ';
 }
 
 // ---------- สินค้า ----------
@@ -397,7 +397,7 @@ function cart_lines(mysqli $conn, array $customer): array
 function cart_problem(array $line): ?string
 {
     if ($line['rental_date'] < date('Y-m-d')) {
-        return 'วันเริ่มเช่าผ่านไปแล้ว กรุณาลบแล้วเลือกวันใหม่';
+        return 'วันเริ่มเช่าผ่านไปแล้ว กรุณาลบรายการนี้แล้วเลือกวันใหม่นะคะ';
     }
     return $line['conflicts'] ? conflict_message($line['conflicts']) : null;
 }
@@ -438,16 +438,16 @@ function next_id(mysqli $conn, string $table, string $column, string $prefix, in
 function save_image(?array $upload, string $dir, ?string $name = null): array
 {
     if (!$upload || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        return ['error' => 'กรุณาเลือกไฟล์รูป'];
+        return ['error' => 'กรุณาเลือกไฟล์รูปค่ะ'];
     }
     if ($upload['error'] !== UPLOAD_ERR_OK || $upload['size'] > IMAGE_MAX_BYTES) {
-        return ['error' => 'ไฟล์ใหญ่เกิน 2 MB หรืออัปโหลดไม่สำเร็จ'];
+        return ['error' => 'ไฟล์ใหญ่เกิน 2 MB หรืออัปโหลดไม่สำเร็จค่ะ'];
     }
 
     $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name']);
     if (!isset($allowed[$mime]) || getimagesize($upload['tmp_name']) === false) {
-        return ['error' => 'รองรับเฉพาะไฟล์รูป JPG, PNG หรือ WEBP'];
+        return ['error' => 'รองรับเฉพาะไฟล์ JPG, PNG หรือ WEBP ค่ะ'];
     }
 
     if (demo_mode() && $name !== null) {
@@ -459,11 +459,11 @@ function save_image(?array $upload, string $dir, ?string $name = null): array
     }
     if (demo_mode()) {
         $file = bin2hex(random_bytes(16)) . '.png';
-        return copy(DEMO_SLIP_SAMPLE, $dir . '/' . $file) ? ['file' => $file] : ['error' => 'บันทึกไฟล์ไม่สำเร็จ กรุณาลองใหม่'];
+        return copy(DEMO_SLIP_SAMPLE, $dir . '/' . $file) ? ['file' => $file] : ['error' => 'บันทึกไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้งค่ะ'];
     }
     $file = ($name ?? bin2hex(random_bytes(16))) . '.' . $allowed[$mime];
     if (!move_uploaded_file($upload['tmp_name'], $dir . '/' . $file)) {
-        return ['error' => 'บันทึกไฟล์ไม่สำเร็จ กรุณาลองใหม่'];
+        return ['error' => 'บันทึกไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้งค่ะ'];
     }
     return ['file' => $file];
 }
