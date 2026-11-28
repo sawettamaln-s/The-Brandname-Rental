@@ -4,39 +4,25 @@ require_once 'includes/db.php';
 $customer = current_customer($conn);
 $customer_id = $customer['customers_id'];
 
-$rental_stmt = $conn->prepare("SELECT r.rental_id, r.product_id, p.brand, p.details, r.employees_id, r.track_rentals,
-    r.rental_date, r.rental_days, r.deposit_fee, r.rental_status
-    FROM rentals r LEFT JOIN products p ON p.product_id = r.product_id
-    WHERE r.customers_id = ? ORDER BY r.rental_id DESC");
+// การเช่าทุกใบของลูกค้า (ลูกค้าเป็นเจ้าของผ่านคำสั่งเช่า orders)
+$rental_stmt = $conn->prepare("SELECT r.rental_id, r.order_id, p.brand, p.details, r.track_rentals,
+    r.rental_date, r.rental_days, r.due_date, r.daily_price, r.deposit_fee, r.rental_status,
+    t.track_return, rs.return_date
+    FROM rentals r
+    JOIN orders o ON o.order_id = r.order_id
+    LEFT JOIN products p ON p.product_id = r.product_id
+    LEFT JOIN track_return t ON t.rental_id = r.rental_id
+    LEFT JOIN returnss rs ON rs.rental_id = r.rental_id
+    WHERE o.customers_id = ? ORDER BY r.rental_id DESC");
 $rental_stmt->bind_param("s", $customer_id);
 $rental_stmt->execute();
 $rentals = $rental_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $rental_stmt->close();
 
-$return_stmt = $conn->prepare("
-    SELECT t.rental_id, t.track_return, t.returnl_status, rs.return_date, r.deposit_fee
-    FROM track_return t
-    JOIN rentals r ON t.rental_id = r.rental_id
-    LEFT JOIN returnss rs ON t.rental_id = rs.rental_id
-    WHERE r.customers_id = ? ORDER BY t.rental_id DESC
-");
-$return_stmt->bind_param("s", $customer_id);
-$return_stmt->execute();
-$returns = $return_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$return_stmt->close();
-
-// รายการที่ส่งคืนได้: ร้านยืนยันการเช่าแล้ว และยังไม่เคยแจ้งเลขพัสดุคืน
-$returnable_stmt = $conn->prepare("
-    SELECT r.rental_id, p.brand, p.details FROM rentals r
-    LEFT JOIN products p ON p.product_id = r.product_id
-    WHERE r.customers_id = ? AND r.rental_status = 'Complete'
-      AND NOT EXISTS (SELECT 1 FROM track_return t WHERE t.rental_id = r.rental_id)
-    ORDER BY r.rental_id
-");
-$returnable_stmt->bind_param("s", $customer_id);
-$returnable_stmt->execute();
-$returnable = $returnable_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$returnable_stmt->close();
+// รายการที่ส่งคืนได้: ร้านจัดส่งแล้วและยังไม่ได้แจ้งคืน
+$returnable = array_values(array_filter($rentals, fn($r) => $r['rental_status'] === 'Shipped'));
+// รายการที่แจ้งคืนแล้ว (รอตรวจหรือตรวจแล้ว)
+$returns = array_values(array_filter($rentals, fn($r) => $r['track_return'] !== null));
 
 $request_stmt = $conn->prepare("SELECT status FROM membership_requests WHERE customers_id = ? ORDER BY request_id DESC LIMIT 1");
 $request_stmt->bind_param("s", $customer_id);
@@ -44,10 +30,6 @@ $request_stmt->execute();
 $last_request = $request_stmt->get_result()->fetch_assoc();
 $request_stmt->close();
 $member_pending = !is_member($customer) && ($last_request['status'] ?? '') === 'Pending';
-
-$rental_badges = ['Pending' => ['รอร้านยืนยัน', 'pending'], 'Complete' => ['ยืนยันแล้ว', 'success'], 'Cancel' => ['ยกเลิก', 'danger']];
-$return_badges = ['Pending' => ['รอร้านตรวจสภาพ', 'pending'], 'Complete' => ['สภาพดี', 'success'], 'Cancel' => ['ชำรุด', 'danger']];
-$badge = fn(array $map, string $status) => '<span class="badge badge-' . $map[$status][1] . '">' . $map[$status][0] . '</span>';
 
 page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
 ?>
@@ -88,10 +70,11 @@ page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>รหัสการเช่า</th>
+                            <th>คำสั่ง / รหัสการเช่า</th>
                             <th>สินค้า</th>
-                            <th>วันที่เช่า</th>
-                            <th class="num">จำนวนวัน</th>
+                            <th>วันเริ่มเช่า</th>
+                            <th>ส่งคืนภายใน</th>
+                            <th class="num">ค่าเช่า</th>
                             <th class="num">ค่ามัดจำ</th>
                             <th>เลขพัสดุจัดส่ง</th>
                             <th>สถานะ</th>
@@ -100,13 +83,17 @@ page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
                     <tbody>
                         <?php foreach ($rentals as $rental): ?>
                             <tr>
-                                <td><?php echo e($rental['rental_id']); ?></td>
+                                <td><?php echo e($rental['order_id']); ?><div class="hint"><?php echo e($rental['rental_id']); ?></div></td>
                                 <td><?php echo e($rental['brand'] . ' ' . $rental['details']); ?></td>
                                 <td><?php echo e($rental['rental_date']); ?></td>
-                                <td class="num"><?php echo e($rental['rental_days']); ?></td>
+                                <td><?php echo e($rental['due_date']); ?></td>
+                                <td class="num"><?php echo baht($rental['daily_price'] * $rental['rental_days']); ?><div class="hint"><?php echo e($rental['rental_days']); ?> วัน</div></td>
                                 <td class="num"><?php echo baht($rental['deposit_fee']); ?></td>
-                                <td><?php echo e($rental['track_rentals']); ?></td>
-                                <td><?php echo $badge($rental_badges, $rental['rental_status']); ?></td>
+                                <td><?php echo e($rental['track_rentals'] ?? '-'); ?></td>
+                                <td>
+                                    <?php echo status_badge($rental['rental_status']); ?>
+                                    <?php if (is_overdue($rental)): ?> <span class="badge badge-danger">เกินกำหนดคืน</span><?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -125,29 +112,22 @@ page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
                     <thead>
                         <tr>
                             <th>รหัสการเช่า</th>
+                            <th>สินค้า</th>
                             <th>เลขพัสดุที่ส่งคืน</th>
-                            <th>วันที่แจ้งส่งคืน</th>
+                            <th>วันที่ร้านได้รับ</th>
                             <th>สถานะ</th>
                             <th class="num">มัดจำที่ได้คืน</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($returns as $return): ?>
+                        <?php foreach ($returns as $return): $refund = deposit_refund($return['rental_status'], (int) $return['deposit_fee']); ?>
                             <tr>
                                 <td><?php echo e($return['rental_id']); ?></td>
+                                <td><?php echo e($return['brand'] . ' ' . $return['details']); ?></td>
                                 <td><?php echo e($return['track_return']); ?></td>
                                 <td><?php echo e($return['return_date'] ?? '-'); ?></td>
-                                <td><?php echo $badge($return_badges, $return['returnl_status']); ?></td>
-                                <td class="num">
-                                    <?php
-                                    // สภาพดี คืนมัดจำครึ่งหนึ่ง, ชำรุด ร้านยึดมัดจำทั้งหมด
-                                    if ($return['returnl_status'] === 'Pending') {
-                                        echo '-';
-                                    } else {
-                                        echo baht($return['returnl_status'] === 'Complete' ? intdiv((int) $return['deposit_fee'], 2) : 0);
-                                    }
-                                    ?>
-                                </td>
+                                <td><?php echo status_badge($return['rental_status']); ?></td>
+                                <td class="num"><?php echo $refund === null ? '-' : baht($refund); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -165,7 +145,7 @@ page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
                     <label for="rental_id">รายการเช่าที่จะคืน</label>
                     <select id="rental_id" name="rental_id" required>
                         <?php foreach ($returnable as $item): ?>
-                            <option value="<?php echo e($item['rental_id']); ?>"><?php echo e($item['rental_id'] . ' · ' . $item['brand'] . ' ' . $item['details']); ?></option>
+                            <option value="<?php echo e($item['rental_id']); ?>"><?php echo e($item['rental_id'] . ' · ' . $item['brand'] . ' ' . $item['details'] . ' · คืนภายใน ' . $item['due_date']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -178,7 +158,7 @@ page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
                 </div>
             </form>
         <?php else: ?>
-            <p class="muted">ยังไม่มีรายการที่ต้องส่งคืน (ส่งคืนได้เมื่อร้านยืนยันการเช่าแล้ว)</p>
+            <p class="muted">ยังไม่มีรายการที่ต้องส่งคืน (แจ้งส่งคืนได้เมื่อร้านจัดส่งกระเป๋าแล้ว)</p>
         <?php endif; ?>
     </div>
 </div>

@@ -35,18 +35,29 @@ function demo_seed_file(): ?string
     return null;
 }
 
-/** รีเซ็ตเมื่อเวลาผ่านไปครบกำหนดนับจากการรีเซ็ตครั้งล่าสุด (ครั้งแรกที่เปิดเว็บจะเริ่มนับเวลา ไม่ล้างข้อมูล) */
+/**
+ * รีเซ็ตเมื่อเวลาผ่านไปครบกำหนดนับจากการรีเซ็ตครั้งล่าสุด หรือเมื่อ schema.sql เปลี่ยน (อัปโหลดโค้ดเวอร์ชันใหม่ที่มีตารางต่างจากเดิม)
+ * ไฟล์ stamp เก็บเวลาที่รีเซ็ตและ hash ของ schema.sql ที่ใช้ ครั้งแรกที่เปิดเว็บจะเริ่มนับเวลา ไม่ล้างข้อมูล
+ */
 function maybe_reset_demo(mysqli $conn): void
 {
     global $config;
-    $last = is_file(DEMO_STAMP_FILE) ? (int) file_get_contents(DEMO_STAMP_FILE) : 0;
+    $stamp = is_file(DEMO_STAMP_FILE) ? explode("\n", trim((string) file_get_contents(DEMO_STAMP_FILE))) : [];
+    $last = (int) ($stamp[0] ?? 0);
     if ($last === 0) {
         demo_write_stamp();
         return;
     }
-    if (time() - $last >= (int) $config['demo_reset_hours'] * 3600) {
+    $schema_changed = ($stamp[1] ?? '') !== demo_schema_hash();
+    if ($schema_changed || time() - $last >= (int) $config['demo_reset_hours'] * 3600) {
         reset_demo($conn);
     }
+}
+
+function demo_schema_hash(): string
+{
+    $seed = demo_seed_file();
+    return $seed === null ? '' : md5_file($seed);
 }
 
 function demo_write_stamp(): void
@@ -54,7 +65,7 @@ function demo_write_stamp(): void
     if (!is_dir(dirname(DEMO_STAMP_FILE))) {
         mkdir(dirname(DEMO_STAMP_FILE), 0755, true);
     }
-    file_put_contents(DEMO_STAMP_FILE, (string) time(), LOCK_EX);
+    file_put_contents(DEMO_STAMP_FILE, time() . "\n" . demo_schema_hash(), LOCK_EX);
 }
 
 /**

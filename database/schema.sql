@@ -10,7 +10,7 @@
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS membership_requests, track_return, returnss, rentals, stores, products, employees, admins, customers;
+DROP TABLE IF EXISTS membership_requests, track_return, returnss, rentals, orders, stores, products, employees, admins, customers;
 SET FOREIGN_KEY_CHECKS = 1;
 
 CREATE TABLE customers (
@@ -86,44 +86,83 @@ INSERT INTO products (product_id, brand, details, daily_rental_price, image) VAL
 ('PD0009', 'Prada',     'Alma mini',                        1500, 'PD0009.png'),
 ('PD0010', 'YSL',       'Medium College in CROC',           1900, 'PD0010.png');
 
+-- คำสั่งเช่า: การชำระเงินหนึ่งครั้ง (ตะกร้าหนึ่งครั้ง) มีกระเป๋าได้หลายใบในตาราง rentals
+-- ลูกค้าแนบสลิปตอนสั่ง ร้านตรวจสลิปแล้วอนุมัติหรือปฏิเสธทั้งคำสั่ง
+CREATE TABLE orders (
+    order_id     VARCHAR(50)  PRIMARY KEY,
+    customers_id VARCHAR(50)  NOT NULL,
+    slip_file    VARCHAR(100) NULL,       -- ชื่อไฟล์สลิปใน uploads/slips (ข้อมูลตัวอย่างไม่มีไฟล์สลิป)
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at  DATETIME     NULL,       -- เวลาที่ร้านตรวจสลิป
+    FOREIGN KEY (customers_id) REFERENCES customers(customers_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO orders (order_id, customers_id, slip_file, created_at, reviewed_at) VALUES
+('ORD0001', 'C001', NULL, '2025-06-03 10:12:00', '2025-06-03 13:00:00'),
+('ORD0002', 'C002', NULL, '2025-06-09 19:40:00', '2025-06-10 09:30:00'),
+('ORD0003', 'C003', NULL, '2025-07-02 08:05:00', '2025-07-02 11:20:00'),
+('ORD0004', 'C004', NULL, '2025-07-16 21:15:00', '2025-07-17 10:00:00'),
+('ORD0005', 'C005', NULL, '2025-08-09 12:30:00', '2025-08-09 15:45:00'),
+('ORD0006', 'C006', NULL, '2025-09-26 18:00:00', '2025-09-27 09:10:00'),
+('ORD0007', 'C007', NULL, '2025-10-22 14:25:00', '2025-10-22 16:00:00'),
+('ORD0008', 'C008', NULL, '2025-11-13 09:50:00', '2025-11-13 13:30:00'),
+('ORD0009', 'C009', NULL, '2025-12-14 20:10:00', '2025-12-15 09:00:00'),
+('ORD0010', 'C010', NULL, '2025-12-30 11:00:00', '2025-12-30 14:20:00'),
+-- คำสั่งที่ยังไม่จบ วันที่อิงจากวันที่นำเข้าข้อมูล เว็บเดโมจึงมีตัวอย่างทุกสถานะหลังรีเซ็ต
+('ORD0011', 'C001', NULL, NOW() - INTERVAL 5 DAY, NOW() - INTERVAL 5 DAY),
+('ORD0012', 'C005', NULL, NOW() - INTERVAL 9 DAY, NOW() - INTERVAL 9 DAY),
+('ORD0013', 'C003', NULL, NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 1 DAY);
+
 -- การเช่า: หนึ่งแถวต่อกระเป๋าหนึ่งใบ
 -- ค่ามัดจำ: สมาชิก 0 บาท, ไม่เป็นสมาชิก 900 บาทต่อใบ
+-- daily_price คือราคาต่อวัน ณ วันที่สั่ง ยอดของคำสั่งเก่าจึงไม่เปลี่ยนเมื่อร้านแก้ราคาสินค้า
+-- due_date (ส่งคืนภายในวันที่) = วันเริ่มเช่า + จำนวนวัน คำนวณโดยฐานข้อมูล
+-- สถานะ: Pending รอร้านตรวจสลิป → Paid ชำระแล้ว รอจัดส่ง → Shipped จัดส่งแล้ว อยู่ระหว่างเช่า
+--        → Returning ลูกค้าส่งคืนแล้ว รอร้านตรวจสภาพ → Returned สภาพดี / Damaged ชำรุด
+--        Cancelled = ร้านปฏิเสธสลิป
+-- employees_id (พนักงานที่จัดส่ง), track_rentals (เลขพัสดุ) และ shipped_date บันทึกตอนร้านจัดส่ง
 CREATE TABLE rentals (
     rental_id     VARCHAR(50) PRIMARY KEY,
-    customers_id  VARCHAR(50),
-    product_id    VARCHAR(50),
-    employees_id  VARCHAR(50),
-    track_rentals VARCHAR(50),
-    rental_date   DATE,
-    rental_days   INT,
-    deposit_fee   INT,
-    rental_status ENUM('Pending', 'Complete', 'Cancel') DEFAULT 'Pending',
-    FOREIGN KEY (customers_id) REFERENCES customers(customers_id),
+    order_id      VARCHAR(50) NOT NULL,
+    product_id    VARCHAR(50) NOT NULL,
+    employees_id  VARCHAR(50) NULL,
+    track_rentals VARCHAR(50) NULL,
+    rental_date   DATE        NOT NULL,
+    rental_days   INT         NOT NULL,
+    due_date      DATE AS (rental_date + INTERVAL rental_days DAY) STORED,
+    daily_price   INT         NOT NULL,
+    deposit_fee   INT         NOT NULL,
+    shipped_date  DATE        NULL,
+    rental_status ENUM('Pending', 'Paid', 'Shipped', 'Returning', 'Returned', 'Damaged', 'Cancelled') NOT NULL DEFAULT 'Pending',
+    INDEX idx_rentals_product_status (product_id, rental_status),
+    FOREIGN KEY (order_id)     REFERENCES orders(order_id),
     FOREIGN KEY (product_id)   REFERENCES products(product_id),
     FOREIGN KEY (employees_id) REFERENCES employees(employees_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO rentals (rental_id, customers_id, product_id, employees_id, track_rentals, rental_date, rental_days, deposit_fee, rental_status) VALUES
-('Ren1111', 'C001', 'PD0001', 'E001', 'EF123456789TH', '2025-06-05', 1, 900, 'Complete'),
-('Ren1112', 'C002', 'PD0010', 'E002', 'EA321456789TH', '2025-06-11', 3, 900, 'Complete'),
-('Ren1113', 'C003', 'PD0003', 'E003', 'EE431256789TH', '2025-07-05', 1,   0, 'Complete'),
-('Ren1114', 'C004', 'PD0004', 'E004', 'AF789561235TH', '2025-07-19', 3,   0, 'Complete'),
-('Ren1115', 'C005', 'PD0009', 'E003', 'FA123785689TH', '2025-08-12', 1, 900, 'Complete'),
-('Ren1116', 'C006', 'PD0006', 'E001', 'FF124411789TH', '2025-09-29', 3, 900, 'Complete'),
-('Ren1117', 'C007', 'PD0007', 'E002', 'EF123451169TH', '2025-10-25', 1,   0, 'Complete'),
-('Ren1118', 'C008', 'PD0008', 'E002', 'FE112556789TH', '2025-11-16', 3,   0, 'Complete'),
-('Ren1119', 'C009', 'PD0002', 'E004', 'TA897456789TH', '2025-12-17', 1,   0, 'Complete'),
-('Ren1120', 'C010', 'PD0005', 'E001', 'TH985256789TH', '2026-01-02', 3, 900, 'Complete');
+INSERT INTO rentals (rental_id, order_id, product_id, employees_id, track_rentals, rental_date, rental_days, daily_price, deposit_fee, shipped_date, rental_status) VALUES
+('Ren1111', 'ORD0001', 'PD0001', 'E001', 'EF123456789TH', '2025-06-05', 1, 4100, 900, '2025-06-04', 'Returned'),
+('Ren1112', 'ORD0002', 'PD0010', 'E002', 'EA321456789TH', '2025-06-11', 3, 1900, 900, '2025-06-10', 'Returned'),
+('Ren1113', 'ORD0003', 'PD0003', 'E003', 'EE431256789TH', '2025-07-05', 1, 2300,   0, '2025-07-03', 'Returned'),
+('Ren1114', 'ORD0004', 'PD0004', 'E004', 'AF789561235TH', '2025-07-19', 3, 1900,   0, '2025-07-17', 'Returned'),
+('Ren1115', 'ORD0005', 'PD0009', 'E003', 'FA123785689TH', '2025-08-12', 1, 1500, 900, '2025-08-10', 'Returned'),
+('Ren1116', 'ORD0006', 'PD0006', 'E001', 'FF124411789TH', '2025-09-29', 3, 2800, 900, '2025-09-27', 'Damaged'),
+('Ren1117', 'ORD0007', 'PD0007', 'E002', 'EF123451169TH', '2025-10-25', 1, 3550,   0, '2025-10-23', 'Returned'),
+('Ren1118', 'ORD0008', 'PD0008', 'E002', 'FE112556789TH', '2025-11-16', 3, 5200,   0, '2025-11-14', 'Returned'),
+('Ren1119', 'ORD0009', 'PD0002', 'E004', 'TA897456789TH', '2025-12-17', 1, 3900,   0, '2025-12-15', 'Returned'),
+('Ren1120', 'ORD0010', 'PD0005', 'E001', 'TH985256789TH', '2026-01-02', 3, 3300, 900, '2025-12-31', 'Returned'),
+-- อยู่ระหว่างเช่า: ลูกค้าทดลอง chaiya แจ้งส่งคืนได้
+('Ren1121', 'ORD0011', 'PD0003', 'E001', 'EF555666777TH', CURDATE() - INTERVAL 2 DAY, 3, 2300, 900, CURDATE() - INTERVAL 3 DAY, 'Shipped'),
+-- เกินกำหนดคืน: แสดงในหน้าแอดมิน
+('Ren1122', 'ORD0012', 'PD0001', 'E002', 'EA888999000TH', CURDATE() - INTERVAL 6 DAY, 2, 4100, 900, CURDATE() - INTERVAL 7 DAY, 'Shipped'),
+-- ชำระแล้ว รอจัดส่ง: แอดมินทดลองกรอกเลขพัสดุได้
+('Ren1123', 'ORD0013', 'PD0008', NULL,   NULL,            CURDATE() + INTERVAL 3 DAY, 2, 5200,   0, NULL, 'Paid');
 
--- ราคารวมของแต่ละรายการเช่า (ค่าเช่ารายวัน x จำนวนวัน + ค่ามัดจำ)
--- SELECT r.rental_id, (p.daily_rental_price * r.rental_days) + r.deposit_fee AS total_rental_price
--- FROM products p JOIN rentals r ON p.product_id = r.product_id;
-
--- วันที่ร้านได้รับของคืน (บันทึกเมื่อแอดมินตรวจสภาพแล้ว)
+-- วันที่ร้านได้รับของคืน (บันทึกเมื่อแอดมินตรวจสภาพ)
 CREATE TABLE returnss (
     return_id   VARCHAR(50) PRIMARY KEY,
-    rental_id   VARCHAR(50),
-    return_date DATE,
+    rental_id   VARCHAR(50) NOT NULL UNIQUE,
+    return_date DATE        NOT NULL,
     FOREIGN KEY (rental_id) REFERENCES rentals(rental_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -152,28 +191,27 @@ CREATE TABLE stores (
 INSERT INTO stores (postal_code, name_store, owner_firstname, owner_lastname, email, address, phone) VALUES
 ('73000', 'sumsumbag_shop', 'Somjai', 'Jaidee', 'sumsum_bag_shop@gmail.com', '6, Rajamankha Nai Rd.,Amphoe Muang, Nakhon Pathom', '081-2345678');
 
--- เลขพัสดุที่ลูกค้าส่งของคืน
--- Complete = ของสภาพดี คืนมัดจำครึ่งหนึ่ง, Cancel = ของชำรุด ร้านยึดมัดจำทั้งหมด
+-- เลขพัสดุที่ลูกค้าส่งของคืน (หนึ่งรายการเช่าแจ้งคืนได้ครั้งเดียว)
+-- ผลการตรวจสภาพเก็บใน rentals.rental_status: Returned = สภาพดี คืนมัดจำครึ่งหนึ่ง, Damaged = ชำรุด ร้านยึดมัดจำทั้งหมด
 CREATE TABLE track_return (
     track_return   VARCHAR(50) PRIMARY KEY NOT NULL,
-    rental_id      VARCHAR(50) NOT NULL,
+    rental_id      VARCHAR(50) NOT NULL UNIQUE,
     postal_code    VARCHAR(10) NOT NULL,
-    returnl_status ENUM('Pending', 'Complete', 'Cancel') DEFAULT 'Pending',
     FOREIGN KEY (rental_id)   REFERENCES rentals(rental_id),
     FOREIGN KEY (postal_code) REFERENCES stores(postal_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO track_return (track_return, rental_id, postal_code, returnl_status) VALUES
-('TH123456789TH',   'Ren1111', '73000', 'Complete'),
-('TH987654321TH',   'Ren1112', '73000', 'Complete'),
-('KEX12345678901',  'Ren1113', '73000', 'Complete'),
-('KEX98765432102',  'Ren1114', '73000', 'Complete'),
-('FLASH123456789',  'Ren1115', '73000', 'Complete'),
-('FLASH987654321',  'Ren1116', '73000', 'Cancel'),
-('J&TTH123456789',  'Ren1117', '73000', 'Complete'),
-('J&TTH987654321',  'Ren1118', '73000', 'Complete'),
-('SHOPEE123456789', 'Ren1119', '73000', 'Complete'),
-('BEST123456789TH', 'Ren1120', '73000', 'Complete');
+INSERT INTO track_return (track_return, rental_id, postal_code) VALUES
+('TH123456789TH',   'Ren1111', '73000'),
+('TH987654321TH',   'Ren1112', '73000'),
+('KEX12345678901',  'Ren1113', '73000'),
+('KEX98765432102',  'Ren1114', '73000'),
+('FLASH123456789',  'Ren1115', '73000'),
+('FLASH987654321',  'Ren1116', '73000'),
+('J&TTH123456789',  'Ren1117', '73000'),
+('J&TTH987654321',  'Ren1118', '73000'),
+('SHOPEE123456789', 'Ren1119', '73000'),
+('BEST123456789TH', 'Ren1120', '73000');
 
 -- คำขอสมัครสมาชิก: ลูกค้าแนบสลิป แอดมินตรวจแล้วอนุมัติหรือปฏิเสธ
 CREATE TABLE membership_requests (

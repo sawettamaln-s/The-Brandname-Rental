@@ -15,10 +15,9 @@ if (!preg_match('/^[A-Z0-9&\-]{8,50}$/', $track_return)) {
     redirect("profile.php");
 }
 
-// ส่งคืนได้เฉพาะรายการเช่าของตัวเอง ที่ร้านยืนยันแล้ว และยังไม่เคยแจ้งคืน
-$stmt = $conn->prepare("SELECT 1 FROM rentals r
-    WHERE r.rental_id = ? AND r.customers_id = ? AND r.rental_status = 'Complete'
-      AND NOT EXISTS (SELECT 1 FROM track_return t WHERE t.rental_id = r.rental_id)");
+// ส่งคืนได้เฉพาะรายการเช่าของตัวเองที่ร้านจัดส่งแล้ว (Shipped) และยังไม่ได้แจ้งคืน
+$stmt = $conn->prepare("SELECT 1 FROM rentals r JOIN orders o ON o.order_id = r.order_id
+    WHERE r.rental_id = ? AND o.customers_id = ? AND r.rental_status = 'Shipped'");
 $stmt->bind_param("ss", $rental_id, $customer_id);
 $stmt->execute();
 $allowed = $stmt->get_result()->num_rows === 1;
@@ -31,18 +30,17 @@ if (!$allowed) {
 
 $store = $conn->query("SELECT postal_code FROM stores LIMIT 1")->fetch_assoc();
 $postal_code = $store['postal_code'] ?? '73000';
-$return_date = date("Y-m-d");
 
+// บันทึกเลขพัสดุส่งคืนและเปลี่ยนสถานะเป็นรอตรวจสภาพ วันที่ได้รับของ (returnss) ร้านบันทึกตอนตรวจสภาพ
 $conn->begin_transaction();
 try {
-    $stmt = $conn->prepare("INSERT INTO track_return (track_return, rental_id, postal_code, returnl_status) VALUES (?, ?, ?, 'Pending')");
+    $stmt = $conn->prepare("INSERT INTO track_return (track_return, rental_id, postal_code) VALUES (?, ?, ?)");
     $stmt->bind_param("sss", $track_return, $rental_id, $postal_code);
     $stmt->execute();
     $stmt->close();
 
-    $return_id = next_id($conn, 'returnss', 'return_id', 'Ret', 4);
-    $stmt = $conn->prepare("INSERT INTO returnss (return_id, rental_id, return_date) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $return_id, $rental_id, $return_date);
+    $stmt = $conn->prepare("UPDATE rentals SET rental_status = 'Returning' WHERE rental_id = ? AND rental_status = 'Shipped'");
+    $stmt->bind_param("s", $rental_id);
     $stmt->execute();
     $stmt->close();
 

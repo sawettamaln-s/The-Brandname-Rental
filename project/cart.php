@@ -12,6 +12,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['remove'])) {
 
 $lines = cart_lines($conn, $customer);
 $total = array_sum(array_column($lines, 'subtotal'));
+$has_problem = (bool) array_filter($lines, fn($line) => cart_problem($line) !== null);
 
 page_start('ตะกร้าสินค้า', 'shop', 'cart');
 ?>
@@ -33,8 +34,9 @@ page_start('ตะกร้าสินค้า', 'shop', 'cart');
                 <thead>
                     <tr>
                         <th>สินค้า</th>
-                        <th>วันที่เช่า</th>
+                        <th>วันเริ่มเช่า</th>
                         <th class="num">จำนวนวัน</th>
+                        <th>ส่งคืนภายใน</th>
                         <th class="num">ราคา/วัน</th>
                         <th class="num">ค่าเช่า</th>
                         <th class="num">ค่ามัดจำ</th>
@@ -42,11 +44,15 @@ page_start('ตะกร้าสินค้า', 'shop', 'cart');
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($lines as $line): ?>
-                        <tr>
-                            <td><?php echo e($line['brand'] . ' ' . $line['details']); ?></td>
+                    <?php foreach ($lines as $line): $problem = cart_problem($line); ?>
+                        <tr<?php echo $problem ? ' class="row-problem"' : ''; ?>>
+                            <td>
+                                <?php echo e($line['brand'] . ' ' . $line['details']); ?>
+                                <?php if ($problem): ?><div class="problem"><?php echo e($problem); ?></div><?php endif; ?>
+                            </td>
                             <td><?php echo e($line['rental_date']); ?></td>
                             <td class="num"><?php echo $line['days']; ?></td>
+                            <td><?php echo e($line['due_date']); ?></td>
                             <td class="num"><?php echo baht($line['daily_rental_price']); ?></td>
                             <td class="num"><?php echo baht($line['rent']); ?></td>
                             <td class="num"><?php echo baht($line['deposit']); ?></td>
@@ -61,7 +67,7 @@ page_start('ตะกร้าสินค้า', 'shop', 'cart');
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="5" class="text-right">รวมทั้งหมด (ค่าเช่า + ค่ามัดจำ)</td>
+                        <td colspan="6" class="text-right">รวมทั้งหมด (ค่าเช่า + ค่ามัดจำ)</td>
                         <td class="num" colspan="2"><?php echo baht($total); ?></td>
                     </tr>
                 </tfoot>
@@ -69,8 +75,15 @@ page_start('ตะกร้าสินค้า', 'shop', 'cart');
         </div>
         <div class="actions" style="justify-content: flex-end;">
             <a href="index.php" class="btn btn-outline">เลือกสินค้าเพิ่ม</a>
-            <a href="checkout.php" class="btn btn-success">ชำระเงิน</a>
+            <?php if ($has_problem): ?>
+                <button type="button" class="btn btn-success" disabled title="ลบรายการที่มีปัญหาก่อน">ชำระเงิน</button>
+            <?php else: ?>
+                <a href="checkout.php" class="btn btn-success">ชำระเงิน</a>
+            <?php endif; ?>
         </div>
+        <?php if ($has_problem): ?>
+            <p class="muted text-right">มีรายการที่เช่าไม่ได้ กรุณาลบรายการที่มีกรอบสีแดง แล้วเลือกวันใหม่จากหน้าสินค้า</p>
+        <?php endif; ?>
     <?php else: ?>
         <div class="card text-center">
             <p>ตะกร้าสินค้าของคุณว่างเปล่า</p>

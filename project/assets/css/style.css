@@ -80,6 +80,7 @@ p { margin: 0 0 12px; }
 }
 .btn:hover { background: var(--primary-dark); }
 .btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .btn-success { background: var(--success); }
 .btn-success:hover { background: #1e8e4f; }
 .btn-danger { background: var(--danger); }
@@ -126,6 +127,7 @@ p { margin: 0 0 12px; }
 .badge-pending { background: #fdf2e6; color: var(--warning); }
 .badge-success { background: var(--success-soft); color: var(--success); }
 .badge-danger { background: var(--danger-soft); color: var(--danger); }
+.badge-info { background: var(--primary-soft); color: var(--primary-dark); }
 
 /* ---------- รายการข้อมูล (ชื่อ: ค่า) ---------- */
 .info-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; }
@@ -150,6 +152,18 @@ p { margin: 0 0 12px; }
 .product-detail .photo { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
 .product-detail .photo img { width: 100%; max-height: 420px; object-fit: contain; }
 .product-detail .price { font-size: 1.3rem; font-weight: 600; color: var(--primary-dark); }
+.booked { background: var(--bg); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
+.booked ul { margin: 0; padding-left: 20px; }
+.booked p { margin: 0; }
+.hint { font-size: 0.85rem; color: var(--muted); }
+.order-card + .order-card { margin-top: 20px; }
+.order-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.order-head h3 { margin: 0 0 4px; }
+.ship-form { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ship-form input, .ship-form select { padding: 6px 10px; font: inherit; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 6px; }
+.ship-form input { width: 150px; }
+.row-problem td { background: var(--danger-soft); }
+.problem { color: var(--danger); font-size: 0.85rem; margin-top: 4px; }
 
 /* ---------- ชำระเงิน ---------- */
 .payment { text-align: center; }

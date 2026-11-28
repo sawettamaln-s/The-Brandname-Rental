@@ -1,9 +1,10 @@
 <?php
-// ฟังก์ชันส่วนกลาง: session, การแสดงข้อความอย่างปลอดภัย, CSRF, การตรวจสิทธิ์, ค่ามัดจำ, การสร้างรหัส และการอัปโหลดรูป
+// ฟังก์ชันส่วนกลาง: session, การแสดงข้อความอย่างปลอดภัย, CSRF, การตรวจสิทธิ์, ค่ามัดจำ, สถานะการเช่า, การจองซ้อน, การสร้างรหัส และการอัปโหลดรูป
 
 const DEPOSIT_FEE = 900;        // ค่ามัดจำต่อกระเป๋าหนึ่งใบสำหรับผู้ที่ไม่เป็นสมาชิก
 const MEMBER_FEE = 3000;        // ค่าสมัครสมาชิก 1 ปี
 const MAX_RENTAL_DAYS = 30;     // จำนวนวันเช่าสูงสุดต่อรายการ
+const TURNAROUND_DAYS = 2;      // วันพักหลังวันครบกำหนดคืน สำหรับขนส่งขากลับและทำความสะอาด ก่อนให้เช่าต่อ
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 const APP_ROOT = __DIR__ . '/..';
 const SLIP_DIR = APP_ROOT . '/uploads/slips';
@@ -143,6 +144,94 @@ function find_customer(mysqli $conn, string $customer_id): ?array
     return $row ?: null;
 }
 
+// ---------- สถานะการเช่า ----------
+/** สถานะที่ยังถือกระเป๋าไว้ (รอตรวจสลิปก็ถือไว้ กันลูกค้าสองคนโอนเงินจองช่วงเดียวกัน) */
+const HOLDING_STATUSES = ['Pending', 'Paid', 'Shipped', 'Returning'];
+
+/** ข้อความและสีของป้ายสถานะการเช่า */
+const RENTAL_STATUS = [
+    'Pending'   => ['รอร้านตรวจสลิป', 'pending'],
+    'Paid'      => ['ชำระแล้ว รอจัดส่ง', 'info'],
+    'Shipped'   => ['อยู่ระหว่างเช่า', 'info'],
+    'Returning' => ['ส่งคืนแล้ว รอตรวจสภาพ', 'pending'],
+    'Returned'  => ['คืนแล้ว สภาพดี', 'success'],
+    'Damaged'   => ['คืนแล้ว ชำรุด', 'danger'],
+    'Cancelled' => ['ยกเลิก', 'danger'],
+];
+
+function status_badge(string $status): string
+{
+    [$label, $tone] = RENTAL_STATUS[$status] ?? [$status, 'pending'];
+    return '<span class="badge badge-' . $tone . '">' . e($label) . '</span>';
+}
+
+/** เกินกำหนดคืน: ยังอยู่กับลูกค้าและเลยวันที่ต้องส่งคืนแล้ว */
+function is_overdue(array $rental): bool
+{
+    return ($rental['rental_status'] ?? '') === 'Shipped' && $rental['due_date'] < date('Y-m-d');
+}
+
+/** มัดจำที่ลูกค้าได้คืน: สภาพดีได้คืนครึ่งหนึ่ง ชำรุดร้านยึดทั้งหมด ยังไม่ตรวจได้ null */
+function deposit_refund(string $status, int $deposit): ?int
+{
+    return match ($status) {
+        'Returned' => intdiv($deposit, 2),
+        'Damaged' => 0,
+        default => null,
+    };
+}
+
+/** วันที่ต้องส่งคืน = วันเริ่มเช่า + จำนวนวัน (ตรงกับคอลัมน์ rentals.due_date) */
+function due_date_for(string $rental_date, int $days): string
+{
+    return date('Y-m-d', strtotime("$rental_date +$days day"));
+}
+
+// ---------- การจองซ้อน ----------
+/**
+ * การเช่าที่ทับช่วงที่ขอ แต่ละการเช่าถือกระเป๋าตั้งแต่วันเริ่มเช่าถึงก่อน due_date + TURNAROUND_DAYS
+ * ช่วงที่ขอคิดแบบเดียวกัน ทั้งสองช่วงเป็นแบบไม่รวมวันสุดท้าย จึงทับกันเมื่อ เริ่มของแต่ละฝั่ง < สิ้นสุดของอีกฝั่ง
+ * คืนค่ารายการช่วงที่ทับ แต่ละรายการมี rental_date และ busy_until (วันสุดท้ายที่กระเป๋าไม่ว่าง)
+ */
+function booking_conflicts(mysqli $conn, string $product_id, string $rental_date, int $days): array
+{
+    $statuses = "'" . implode("','", HOLDING_STATUSES) . "'";
+    $stmt = $conn->prepare("SELECT rental_date, due_date + INTERVAL " . (TURNAROUND_DAYS - 1) . " DAY AS busy_until
+        FROM rentals
+        WHERE product_id = ? AND rental_status IN ($statuses)
+          AND rental_date < ? + INTERVAL ? DAY
+          AND ? < due_date + INTERVAL " . TURNAROUND_DAYS . " DAY
+        ORDER BY rental_date");
+    $span = $days + TURNAROUND_DAYS;
+    $stmt->bind_param('ssis', $product_id, $rental_date, $span, $rental_date);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $rows;
+}
+
+/** ช่วงที่กระเป๋าไม่ว่างตั้งแต่วันนี้ไป สำหรับแสดงในหน้าสินค้า */
+function booked_ranges(mysqli $conn, string $product_id): array
+{
+    $statuses = "'" . implode("','", HOLDING_STATUSES) . "'";
+    $stmt = $conn->prepare("SELECT rental_date, due_date + INTERVAL " . (TURNAROUND_DAYS - 1) . " DAY AS busy_until
+        FROM rentals
+        WHERE product_id = ? AND rental_status IN ($statuses)
+          AND due_date + INTERVAL " . TURNAROUND_DAYS . " DAY > CURDATE()
+        ORDER BY rental_date");
+    $stmt->bind_param('s', $product_id);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $rows;
+}
+
+function conflict_message(array $conflicts): string
+{
+    $ranges = array_map(fn($c) => $c['rental_date'] . ' ถึง ' . $c['busy_until'], $conflicts);
+    return 'กระเป๋าใบนี้ไม่ว่างช่วง ' . implode(', ', $ranges) . ' กรุณาเลือกวันอื่น';
+}
+
 // ---------- สินค้า ----------
 /** URL รูปสินค้า (เทียบจากโฟลเดอร์ของหน้าที่เรียก) ถ้าไม่มีรูปจะได้รูปตัวแทน */
 function product_image_url(array $product, string $base = ''): string
@@ -158,6 +247,7 @@ function product_image_url(array $product, string $base = ''): string
 /**
  * รายการในตะกร้าพร้อมข้อมูลสินค้าและราคาปัจจุบันจากฐานข้อมูล
  * ค่ามัดจำคิดต่อกระเป๋าหนึ่งใบตามสถานะสมาชิกของลูกค้า
+ * conflicts คือช่วงที่มีคนจองทับไปแล้ว (เช่น มีคนสั่งก่อนระหว่างที่ของอยู่ในตะกร้า)
  */
 function cart_lines(mysqli $conn, array $customer): array
 {
@@ -174,17 +264,29 @@ function cart_lines(mysqli $conn, array $customer): array
         if (!$product) {
             continue;
         }
-        $rent = (int) $product['daily_rental_price'] * (int) $item['days'];
+        $days = (int) $item['days'];
+        $rent = (int) $product['daily_rental_price'] * $days;
         $lines[] = $product + [
-            'days' => (int) $item['days'],
+            'days' => $days,
             'rental_date' => $item['rental_date'],
+            'due_date' => due_date_for($item['rental_date'], $days),
             'rent' => $rent,
             'deposit' => $deposit,
             'subtotal' => $rent + $deposit,
+            'conflicts' => booking_conflicts($conn, $product['product_id'], $item['rental_date'], $days),
         ];
     }
     $stmt->close();
     return $lines;
+}
+
+/** รายการในตะกร้าที่ยังเช่าไม่ได้: วันเริ่มเช่าผ่านไปแล้ว หรือมีคนจองทับ */
+function cart_problem(array $line): ?string
+{
+    if ($line['rental_date'] < date('Y-m-d')) {
+        return 'วันเริ่มเช่าผ่านไปแล้ว กรุณาลบแล้วเลือกวันใหม่';
+    }
+    return $line['conflicts'] ? conflict_message($line['conflicts']) : null;
 }
 
 function cart_count(): int
@@ -194,7 +296,7 @@ function cart_count(): int
 
 // ---------- การสร้างรหัส ----------
 /**
- * รหัสถัดไปของตาราง เช่น C011, PD0011, Ren1121
+ * รหัสถัดไปของตาราง เช่น C011, PD0011, ORD0014, Ren1124
  * แปลงส่วนตัวเลขเป็นตัวเลขก่อนหาค่ามากสุด จึงเรียงถูกแม้จำนวนหลักเพิ่มขึ้น
  * $table และ $column มาจากโค้ดเท่านั้น ไม่ได้มาจากผู้ใช้
  */
@@ -209,22 +311,6 @@ function next_id(mysqli $conn, string $table, string $column, string $prefix, in
     $max = (int) ($stmt->get_result()->fetch_assoc()['max_num'] ?? 0);
     $stmt->close();
     return $prefix . str_pad((string) ($max + 1), $pad, '0', STR_PAD_LEFT);
-}
-
-function generate_tracking_number(): string
-{
-    $letters = chr(random_int(65, 90)) . chr(random_int(65, 90));
-    $numbers = '';
-    for ($i = 0; $i < 9; $i++) {
-        $numbers .= random_int(0, 9);
-    }
-    return $letters . $numbers . 'TH';
-}
-
-function random_employee_id(mysqli $conn): ?string
-{
-    $row = $conn->query('SELECT employees_id FROM employees ORDER BY RAND() LIMIT 1')->fetch_assoc();
-    return $row['employees_id'] ?? null;
 }
 
 // ---------- อัปโหลดรูป ----------
