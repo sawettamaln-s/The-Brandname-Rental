@@ -28,7 +28,8 @@ function page_start(string $title, string $area = 'shop', string $active = ''): 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=Noto+Serif+Thai:wght@500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?php echo $base; ?>assets/css/style.css">
+    <?php // เลขเวอร์ชันจากเวลาที่แก้ไฟล์ล่าสุด: อัปโหลด CSS ใหม่แล้วเบราว์เซอร์โหลดใหม่เอง ไม่ใช้ไฟล์เก่าที่จำไว้ ?>
+    <link rel="stylesheet" href="<?php echo $base; ?>assets/css/style.css?v=<?php echo (int) @filemtime(APP_ROOT . '/assets/css/style.css'); ?>">
 </head>
 <body class="area-<?php echo e($area); ?>">
 <div class="top-strip">
