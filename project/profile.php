@@ -7,7 +7,7 @@ $customer_id = $customer['customers_id'];
 // การเช่าทุกใบของลูกค้า (ลูกค้าเป็นเจ้าของผ่านคำสั่งเช่า orders)
 $rental_stmt = $conn->prepare("SELECT r.rental_id, r.order_id, p.brand, p.details, r.track_rentals,
     r.rental_date, r.rental_days, r.due_date, r.daily_price, r.deposit_fee, r.rental_status,
-    t.track_return, rs.return_date
+    t.track_return, rs.return_date, rs.deduction, rs.deduction_note
     FROM rentals r
     JOIN orders o ON o.order_id = r.order_id
     LEFT JOIN products p ON p.product_id = r.product_id
@@ -90,9 +90,9 @@ page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
                                 <td class="num"><?php echo baht($rental['daily_price'] * $rental['rental_days']); ?><div class="hint"><?php echo e($rental['rental_days']); ?> วัน</div></td>
                                 <td class="num"><?php echo baht($rental['deposit_fee']); ?></td>
                                 <td><?php echo e($rental['track_rentals'] ?? '-'); ?></td>
-                                <td>
-                                    <?php echo status_badge($rental['rental_status']); ?>
-                                    <?php if (is_overdue($rental)): ?> <span class="badge badge-danger">เกินกำหนดคืน</span><?php endif; ?>
+                                <td class="status-cell">
+                                    <?php echo status_badge($rental); ?>
+                                    <div class="hint"><?php echo e(status_hint($rental)); ?></div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -117,17 +117,19 @@ page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
                             <th>วันที่ร้านได้รับ</th>
                             <th>สถานะ</th>
                             <th class="num">มัดจำที่ได้คืน</th>
+                            <th>หมายเหตุจากร้าน</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($returns as $return): $refund = deposit_refund($return['rental_status'], (int) $return['deposit_fee']); ?>
+                        <?php foreach ($returns as $return): $refund = deposit_refund($return); ?>
                             <tr>
                                 <td><?php echo e($return['rental_id']); ?></td>
                                 <td><?php echo e($return['brand'] . ' ' . $return['details']); ?></td>
                                 <td><?php echo e($return['track_return']); ?></td>
                                 <td><?php echo e($return['return_date'] ?? '-'); ?></td>
-                                <td><?php echo status_badge($return['rental_status']); ?></td>
+                                <td><?php echo status_badge($return); ?></td>
                                 <td class="num"><?php echo $refund === null ? '-' : baht($refund); ?></td>
+                                <td><?php echo $return['deduction'] > 0 ? 'หัก ' . baht($return['deduction']) . ($return['deduction_note'] ? ': ' . e($return['deduction_note']) : '') : e($return['deduction_note'] ?? '-'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -137,7 +139,7 @@ page_start('โปรไฟล์ของฉัน', 'shop', 'profile');
             <p class="muted">ยังไม่มีการคืนสินค้า</p>
         <?php endif; ?>
 
-        <h3 style="margin-top: 24px;">แจ้งส่งคืนสินค้า</h3>
+        <h3 id="return-form" style="margin-top: 24px;">แจ้งส่งคืนสินค้า</h3>
         <?php if ($returnable): ?>
             <form action="process_return.php" method="POST" class="form-grid two-cols">
                 <?php echo csrf_field(); ?>

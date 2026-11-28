@@ -2,14 +2,15 @@
 require_once '../includes/db.php';
 require_admin();
 
-// ขั้นตอนของร้าน: ตรวจสลิปทั้งคำสั่ง (Pending → Paid หรือ Cancelled) → จัดส่งทีละใบพร้อมเลขพัสดุ (Paid → Shipped)
+// ขั้นตอนของร้าน: ตรวจสลิปทั้งคำสั่ง (Pending → Accepted หรือ Cancelled) → เริ่มเตรียมของทีละใบ (Accepted → Preparing)
+// → จัดส่งพร้อมเลขพัสดุ (Preparing → Shipped)
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     verify_csrf();
     $action = input('action');
 
     if ($action === 'approve' || $action === 'reject') {
         $order_id = input('order_id');
-        $new_status = $action === 'approve' ? 'Paid' : 'Cancelled';
+        $new_status = $action === 'approve' ? 'Accepted' : 'Cancelled';
         $conn->begin_transaction();
         try {
             $stmt = $conn->prepare("UPDATE rentals SET rental_status = ? WHERE order_id = ? AND rental_status = 'Pending'");
@@ -26,7 +27,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
             $conn->commit();
             if ($changed > 0) {
-                flash($action === 'approve' ? "อนุมัติคำสั่ง $order_id แล้ว ย้ายไปรอจัดส่ง" : "ปฏิเสธคำสั่ง $order_id แล้ว กระเป๋ากลับมาว่าง");
+                flash($action === 'approve' ? "อนุมัติคำสั่ง $order_id แล้ว สถานะเป็นรับเรื่องแล้ว" : "ปฏิเสธคำสั่ง $order_id แล้ว กระเป๋ากลับมาว่าง");
             } else {
                 flash("คำสั่งนี้ถูกตรวจไปแล้ว", "error");
             }
@@ -35,6 +36,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             error_log('admin orders review failed: ' . $e->getMessage());
             flash("บันทึกไม่สำเร็จ กรุณาลองใหม่", "error");
         }
+    } elseif ($action === 'prepare') {
+        $rental_id = input('rental_id');
+        $stmt = $conn->prepare("UPDATE rentals SET rental_status = 'Preparing' WHERE rental_id = ? AND rental_status = 'Accepted'");
+        $stmt->bind_param("s", $rental_id);
+        $stmt->execute();
+        $changed = $stmt->affected_rows > 0;
+        $stmt->close();
+        flash($changed ? "เริ่มเตรียม $rental_id แล้ว" : "รายการนี้ไม่อยู่ในสถานะรับเรื่องแล้ว", $changed ? 'success' : 'error');
     } elseif ($action === 'ship') {
         $rental_id = input('rental_id');
         $track = strtoupper(input('track_rentals'));
@@ -52,12 +61,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             flash("กรุณาเลือกพนักงานที่จัดส่ง", "error");
         } else {
             $stmt = $conn->prepare("UPDATE rentals SET rental_status = 'Shipped', track_rentals = ?, employees_id = ?, shipped_date = CURDATE()
-                WHERE rental_id = ? AND rental_status = 'Paid'");
+                WHERE rental_id = ? AND rental_status = 'Preparing'");
             $stmt->bind_param("sss", $track, $employee_id, $rental_id);
             $stmt->execute();
             $shipped = $stmt->affected_rows > 0;
             $stmt->close();
-            flash($shipped ? "บันทึกการจัดส่ง $rental_id แล้ว" : "รายการนี้ไม่อยู่ในสถานะรอจัดส่ง", $shipped ? 'success' : 'error');
+            flash($shipped ? "บันทึกการจัดส่ง $rental_id แล้ว" : "รายการนี้ไม่อยู่ในสถานะกำลังดำเนินการ", $shipped ? 'success' : 'error');
         }
     }
     redirect("orders.php");
@@ -78,8 +87,13 @@ foreach ($pending_rows as $row) {
     $pending_orders[$row['order_id']][] = $row;
 }
 
-// 2) รอจัดส่ง เรียงตามวันเริ่มเช่าที่ใกล้ที่สุดก่อน
-$to_ship = $conn->query("SELECT $rental_columns $rental_from WHERE r.rental_status = 'Paid' ORDER BY r.rental_date, r.rental_id")->fetch_all(MYSQLI_ASSOC);
+// 2) รับเรื่องแล้วและกำลังดำเนินการ เรียงตามวันเริ่มเช่าที่ใกล้ที่สุดก่อน
+// bag_out = การเช่าอื่นของกระเป๋าใบเดียวกันที่ยังไม่กลับถึงร้านหรือยังไม่ได้ตรวจ (เช่น ลูกค้าคนก่อนคืนช้า) ร้านต้องรู้ก่อนรับปากจัดส่ง
+$out_statuses = "'" . implode("','", OUT_STATUSES) . "'";
+$to_ship = $conn->query("SELECT $rental_columns,
+    (SELECT x.rental_id FROM rentals x WHERE x.product_id = r.product_id AND x.rental_id <> r.rental_id
+        AND x.rental_status IN ($out_statuses) ORDER BY x.rental_date LIMIT 1) AS bag_out
+    $rental_from WHERE r.rental_status IN ('Accepted', 'Preparing') ORDER BY r.rental_date, r.rental_id")->fetch_all(MYSQLI_ASSOC);
 
 // 3) อยู่ระหว่างเช่า เรียงตามวันครบกำหนดคืน รายการที่เกินกำหนดจึงขึ้นก่อน
 $on_rent = $conn->query("SELECT $rental_columns, e.employees_firstname $rental_from
@@ -163,8 +177,8 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
     </section>
 
     <section class="card">
-        <h2>2. รอจัดส่ง (<?php echo count($to_ship); ?>)</h2>
-        <p class="muted">ส่งให้ถึงก่อนวันเริ่มเช่า แล้วกรอกเลขพัสดุและพนักงานที่จัดส่ง</p>
+        <h2>2. เตรียมและจัดส่ง (<?php echo count($to_ship); ?>)</h2>
+        <p class="muted">กด "เริ่มเตรียมของ" เมื่อเริ่มเตรียมกระเป๋า (ลูกค้าเห็นสถานะกำลังดำเนินการ) แล้วส่งให้ถึงก่อนวันเริ่มเช่า พร้อมกรอกเลขพัสดุและพนักงานที่จัดส่ง</p>
         <?php if ($to_ship): ?>
             <div class="table-wrap">
                 <table class="table">
@@ -174,7 +188,8 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
                             <th>สินค้า</th>
                             <th>วันเริ่มเช่า</th>
                             <th>ส่งถึง</th>
-                            <th class="text-right">บันทึกการจัดส่ง</th>
+                            <th>สถานะ</th>
+                            <th class="text-right"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -185,18 +200,35 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
                                 <td><?php echo e($row['rental_date']); ?></td>
                                 <td><?php echo e($customer_name($row)); ?><div class="hint"><?php echo e($row['address'] . ' ' . $row['postal_code'] . ' · ' . $row['phonenumber']); ?></div></td>
                                 <td>
-                                    <form method="POST" class="ship-form">
-                                        <?php echo csrf_field(); ?>
-                                        <input type="hidden" name="rental_id" value="<?php echo e($row['rental_id']); ?>">
-                                        <input type="text" name="track_rentals" placeholder="เลขพัสดุ" maxlength="50" pattern="[A-Za-z0-9&\-]{8,50}" title="ตัวอักษรภาษาอังกฤษหรือตัวเลข 8–50 ตัว" aria-label="เลขพัสดุ" required>
-                                        <select name="employees_id" aria-label="พนักงานที่จัดส่ง" required>
-                                            <option value="">พนักงาน</option>
-                                            <?php foreach ($employees as $employee): ?>
-                                                <option value="<?php echo e($employee['employees_id']); ?>"><?php echo e($employee['employees_id'] . ' ' . $employee['employees_firstname']); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                        <button type="submit" name="action" value="ship" class="btn btn-success btn-sm">จัดส่งแล้ว</button>
-                                    </form>
+                                    <?php echo status_badge($row); ?>
+                                    <?php if ($row['rental_date'] < date('Y-m-d')): ?>
+                                        <div class="problem">เลยวันเริ่มเช่าแล้ว ควรติดต่อลูกค้า</div>
+                                    <?php endif; ?>
+                                    <?php if ($row['bag_out']): ?>
+                                        <div class="problem">กระเป๋ายังอยู่กับรายการ <?php echo e($row['bag_out']); ?> (ยังไม่กลับถึงร้านหรือยังไม่ได้ตรวจ)</div>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($row['rental_status'] === 'Accepted'): ?>
+                                        <form method="POST" class="ship-form">
+                                            <?php echo csrf_field(); ?>
+                                            <input type="hidden" name="rental_id" value="<?php echo e($row['rental_id']); ?>">
+                                            <button type="submit" name="action" value="prepare" class="btn btn-sm">เริ่มเตรียมของ</button>
+                                        </form>
+                                    <?php else: ?>
+                                        <form method="POST" class="ship-form">
+                                            <?php echo csrf_field(); ?>
+                                            <input type="hidden" name="rental_id" value="<?php echo e($row['rental_id']); ?>">
+                                            <input type="text" name="track_rentals" placeholder="เลขพัสดุ" maxlength="50" pattern="[A-Za-z0-9&\-]{8,50}" title="ตัวอักษรภาษาอังกฤษหรือตัวเลข 8–50 ตัว" aria-label="เลขพัสดุ" required>
+                                            <select name="employees_id" aria-label="พนักงานที่จัดส่ง" required>
+                                                <option value="">พนักงาน</option>
+                                                <?php foreach ($employees as $employee): ?>
+                                                    <option value="<?php echo e($employee['employees_id']); ?>"><?php echo e($employee['employees_id'] . ' ' . $employee['employees_firstname']); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="submit" name="action" value="ship" class="btn btn-success btn-sm">จัดส่งแล้ว</button>
+                                        </form>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -204,12 +236,12 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
                 </table>
             </div>
         <?php else: ?>
-            <p class="muted">ไม่มีรายการที่รอจัดส่ง</p>
+            <p class="muted">ไม่มีรายการที่รอเตรียมหรือจัดส่ง</p>
         <?php endif; ?>
     </section>
 
     <section class="card">
-        <h2>3. อยู่ระหว่างเช่า (<?php echo count($on_rent); ?>)</h2>
+        <h2>3. จัดส่งแล้วและอยู่ระหว่างเช่า (<?php echo count($on_rent); ?>)</h2>
         <p class="muted">เมื่อลูกค้าแจ้งเลขพัสดุส่งคืน รายการจะย้ายไปหน้า "การคืน"</p>
         <?php if ($on_rent): ?>
             <div class="table-wrap">
@@ -232,7 +264,7 @@ page_start('คำสั่งเช่า', 'admin', 'orders');
                                 <td><?php echo e($row['product_id'] . ' ' . $row['brand']); ?></td>
                                 <td><?php echo e($row['track_rentals']); ?><div class="hint">ส่งเมื่อ <?php echo e($row['shipped_date']); ?> โดย <?php echo e($row['employees_id'] . ' ' . $row['employees_firstname']); ?></div></td>
                                 <td><?php echo e($row['due_date']); ?></td>
-                                <td><?php echo is_overdue($row) ? '<span class="badge badge-danger">เกินกำหนดคืน</span>' : status_badge('Shipped'); ?></td>
+                                <td><?php echo status_badge($row); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

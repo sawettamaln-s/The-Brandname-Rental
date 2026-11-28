@@ -14,9 +14,10 @@ $stmt->close();
 // ตัวเลขงานที่รอทำ แสดงบนหน้าแรกของแอดมิน
 $pending = $conn->query("SELECT
     (SELECT COUNT(DISTINCT order_id) FROM rentals WHERE rental_status = 'Pending') AS orders,
-    (SELECT COUNT(*) FROM rentals WHERE rental_status = 'Paid') AS to_ship,
+    (SELECT COUNT(*) FROM rentals WHERE rental_status IN ('Accepted', 'Preparing')) AS to_ship,
     (SELECT COUNT(*) FROM rentals WHERE rental_status = 'Shipped' AND due_date < CURDATE()) AS overdue,
-    (SELECT COUNT(*) FROM rentals WHERE rental_status = 'Returning') AS returns,
+    (SELECT COUNT(*) FROM rentals WHERE rental_status = 'Returning') AS incoming,
+    (SELECT COUNT(*) FROM rentals WHERE rental_status = 'Received') AS inspect,
     (SELECT COUNT(*) FROM membership_requests WHERE status = 'Pending') AS members")->fetch_assoc();
 
 page_start('สินค้า', 'admin', 'products');
@@ -39,9 +40,10 @@ page_start('สินค้า', 'admin', 'products');
     <div class="alert alert-info">
         งานที่รอทำ:
         <a href="orders.php">ตรวจสลิป <?php echo (int) $pending['orders']; ?> คำสั่ง</a> ·
-        <a href="orders.php">รอจัดส่ง <?php echo (int) $pending['to_ship']; ?> ใบ</a> ·
+        <a href="orders.php">เตรียมและจัดส่ง <?php echo (int) $pending['to_ship']; ?> ใบ</a> ·
         <a href="orders.php">เกินกำหนดคืน <?php echo (int) $pending['overdue']; ?> ใบ</a> ·
-        <a href="returns.php">ตรวจของคืน <?php echo (int) $pending['returns']; ?> ใบ</a> ·
+        <a href="returns.php">กำลังส่งคืน <?php echo (int) $pending['incoming']; ?> ใบ</a> ·
+        <a href="returns.php">ตรวจสภาพ <?php echo (int) $pending['inspect']; ?> ใบ</a> ·
         <a href="members.php">คำขอสมาชิก <?php echo (int) $pending['members']; ?></a>
     </div>
 <?php endif; ?>

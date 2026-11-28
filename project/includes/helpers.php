@@ -145,24 +145,66 @@ function find_customer(mysqli $conn, string $customer_id): ?array
 }
 
 // ---------- สถานะการเช่า ----------
-/** สถานะที่ยังถือกระเป๋าไว้ (รอตรวจสลิปก็ถือไว้ กันลูกค้าสองคนโอนเงินจองช่วงเดียวกัน) */
-const HOLDING_STATUSES = ['Pending', 'Paid', 'Shipped', 'Returning'];
+/**
+ * สถานะที่ยังถือกระเป๋าไว้ จองช่วงเดียวกันซ้ำไม่ได้
+ * รอตรวจสลิปก็ถือไว้ กันลูกค้าสองคนโอนเงินจองช่วงเดียวกัน และของที่ร้านได้รับแล้วแต่ยังไม่ตรวจสภาพก็ยังให้เช่าต่อไม่ได้
+ */
+const HOLDING_STATUSES = ['Pending', 'Accepted', 'Preparing', 'Shipped', 'Returning', 'Received'];
 
-/** ข้อความและสีของป้ายสถานะการเช่า */
+/**
+ * ข้อความและสีของป้ายสถานะการเช่า
+ * Shipped แยกเป็น "จัดส่งแล้ว" (ก่อนวันเริ่มเช่า) และ "อยู่ระหว่างเช่า" (ตั้งแต่วันเริ่มเช่า) ดู rental_stage()
+ */
 const RENTAL_STATUS = [
-    'Pending'   => ['รอร้านตรวจสลิป', 'pending'],
-    'Paid'      => ['ชำระแล้ว รอจัดส่ง', 'info'],
-    'Shipped'   => ['อยู่ระหว่างเช่า', 'info'],
-    'Returning' => ['ส่งคืนแล้ว รอตรวจสภาพ', 'pending'],
-    'Returned'  => ['คืนแล้ว สภาพดี', 'success'],
-    'Damaged'   => ['คืนแล้ว ชำรุด', 'danger'],
+    'Pending'   => ['รอตรวจสลิป', 'pending'],
+    'Accepted'  => ['รับเรื่องแล้ว', 'info'],
+    'Preparing' => ['กำลังดำเนินการ', 'info'],
+    'Shipped'   => ['จัดส่งแล้ว', 'info'],
+    'OnRent'    => ['อยู่ระหว่างเช่า', 'info'],
+    'Returning' => ['กำลังส่งคืน', 'pending'],
+    'Received'  => ['ร้านได้รับของ รอตรวจสภาพ', 'pending'],
+    'Completed' => ['เสร็จสมบูรณ์', 'success'],
+    'Deducted'  => ['หักมัดจำ', 'danger'],
     'Cancelled' => ['ยกเลิก', 'danger'],
 ];
 
-function status_badge(string $status): string
+/** ขั้นที่แสดงให้ผู้ใช้เห็น: เหมือน rental_status ยกเว้นของที่จัดส่งแล้วและถึงวันเริ่มเช่าเป็น OnRent */
+function rental_stage(array $rental): string
 {
-    [$label, $tone] = RENTAL_STATUS[$status] ?? [$status, 'pending'];
+    $status = $rental['rental_status'];
+    if ($status === 'Shipped' && $rental['rental_date'] <= date('Y-m-d')) {
+        return 'OnRent';
+    }
+    return $status;
+}
+
+function status_badge(array $rental): string
+{
+    [$label, $tone] = RENTAL_STATUS[rental_stage($rental)] ?? [$rental['rental_status'], 'pending'];
+    if (is_overdue($rental)) {
+        [$label, $tone] = ['เกินกำหนดคืน', 'danger'];
+    }
     return '<span class="badge badge-' . $tone . '">' . e($label) . '</span>';
+}
+
+/** คำอธิบายใต้ป้ายสถานะฝั่งลูกค้า: บอกว่าตอนนี้เกิดอะไรขึ้นและขั้นถัดไปคืออะไร */
+function status_hint(array $rental): string
+{
+    $deposit = (int) $rental['deposit_fee'];
+    $deduction = (int) ($rental['deduction'] ?? 0);
+    return match (rental_stage($rental)) {
+        'Pending' => 'ร้านกำลังตรวจสลิป',
+        'Accepted' => 'ร้านรับเรื่องแล้ว จะจัดส่งให้ถึงก่อนวันเริ่มเช่า',
+        'Preparing' => 'ร้านกำลังเตรียมกระเป๋าเพื่อจัดส่ง',
+        'Shipped' => 'จัดส่งแล้ว เลขพัสดุ ' . ($rental['track_rentals'] ?? '-'),
+        'OnRent' => is_overdue($rental) ? 'กรุณาส่งคืนและแจ้งเลขพัสดุโดยเร็ว' : 'ส่งคืนภายใน ' . $rental['due_date'],
+        'Returning' => 'รอร้านได้รับของ เลขพัสดุคืน ' . ($rental['track_return'] ?? '-'),
+        'Received' => 'ร้านได้รับของแล้ว กำลังตรวจสภาพเพื่อพิจารณามัดจำ',
+        'Completed' => $deposit > 0 ? 'คืนมัดจำเต็ม ' . baht($deposit) : 'คืนกระเป๋าเรียบร้อย',
+        'Deducted' => 'หักมัดจำ ' . baht($deduction) . ($rental['deduction_note'] ? ': ' . $rental['deduction_note'] : ''),
+        'Cancelled' => 'ร้านปฏิเสธสลิป หากโอนเงินแล้วกรุณาติดต่อร้าน',
+        default => '',
+    };
 }
 
 /** เกินกำหนดคืน: ยังอยู่กับลูกค้าและเลยวันที่ต้องส่งคืนแล้ว */
@@ -171,14 +213,43 @@ function is_overdue(array $rental): bool
     return ($rental['rental_status'] ?? '') === 'Shipped' && $rental['due_date'] < date('Y-m-d');
 }
 
-/** มัดจำที่ลูกค้าได้คืน: สภาพดีได้คืนครึ่งหนึ่ง ชำรุดร้านยึดทั้งหมด ยังไม่ตรวจได้ null */
-function deposit_refund(string $status, int $deposit): ?int
+/** มัดจำที่ลูกค้าได้คืนหลังร้านตรวจสภาพ = ค่ามัดจำ − ยอดที่หัก ยังไม่ตรวจได้ null */
+function deposit_refund(array $rental): ?int
 {
-    return match ($status) {
-        'Returned' => intdiv($deposit, 2),
-        'Damaged' => 0,
-        default => null,
-    };
+    if (!in_array($rental['rental_status'], ['Completed', 'Deducted'], true)) {
+        return null;
+    }
+    return (int) $rental['deposit_fee'] - (int) ($rental['deduction'] ?? 0);
+}
+
+/**
+ * แจ้งเตือนวันคืนของลูกค้า: กระเป๋าที่อยู่กับลูกค้าและครบกำหนดคืนพรุ่งนี้ วันนี้ หรือเลยกำหนดแล้ว
+ * คืนค่ารายการ ['text' => ข้อความ, 'urgent' => เกินกำหนดหรือไม่]
+ */
+function due_reminders(mysqli $conn, string $customer_id): array
+{
+    $stmt = $conn->prepare("SELECT r.rental_id, p.brand, p.details, r.due_date, DATEDIFF(r.due_date, CURDATE()) AS days_left
+        FROM rentals r
+        JOIN orders o ON o.order_id = r.order_id
+        LEFT JOIN products p ON p.product_id = r.product_id
+        WHERE o.customers_id = ? AND r.rental_status = 'Shipped' AND r.due_date <= CURDATE() + INTERVAL 1 DAY
+        ORDER BY r.due_date");
+    $stmt->bind_param("s", $customer_id);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $reminders = [];
+    foreach ($rows as $row) {
+        $bag = $row['brand'] . ' ' . $row['details'] . ' (' . $row['rental_id'] . ')';
+        $days_left = (int) $row['days_left'];
+        $reminders[] = match (true) {
+            $days_left === 1 => ['text' => "พรุ่งนี้ครบกำหนดคืน $bag", 'urgent' => false],
+            $days_left === 0 => ['text' => "วันนี้ครบกำหนดคืน $bag", 'urgent' => false],
+            default => ['text' => "เกินกำหนดคืน " . -$days_left . " วัน: $bag", 'urgent' => true],
+        };
+    }
+    return $reminders;
 }
 
 /** วันที่ต้องส่งคืน = วันเริ่มเช่า + จำนวนวัน (ตรงกับคอลัมน์ rentals.due_date) */
@@ -188,19 +259,35 @@ function due_date_for(string $rental_date, int $days): string
 }
 
 // ---------- การจองซ้อน ----------
+/** สถานะที่กระเป๋ายังไม่กลับถึงร้านหรือยังไม่ได้ตรวจสภาพ */
+const OUT_STATUSES = ['Shipped', 'Returning', 'Received'];
+
 /**
- * การเช่าที่ทับช่วงที่ขอ แต่ละการเช่าถือกระเป๋าตั้งแต่วันเริ่มเช่าถึงก่อน due_date + TURNAROUND_DAYS
- * ช่วงที่ขอคิดแบบเดียวกัน ทั้งสองช่วงเป็นแบบไม่รวมวันสุดท้าย จึงทับกันเมื่อ เริ่มของแต่ละฝั่ง < สิ้นสุดของอีกฝั่ง
+ * SQL ของวันที่กระเป๋าว่างอีกครั้ง (ไม่รวมวันนั้น) ของการเช่าแต่ละรายการ = วันสิ้นสุดการเช่า + TURNAROUND_DAYS
+ * วันสิ้นสุดปกติคือ due_date แต่ถ้ากระเป๋ายังไม่กลับหรือยังไม่ได้ตรวจและเลยกำหนดแล้ว ให้นับถึงวันนี้
+ * กระเป๋าที่คืนช้าจึงยังกันการจองไว้ จนกว่าร้านจะตรวจสภาพเสร็จ
+ */
+function hold_end_sql(): string
+{
+    $out = "'" . implode("','", OUT_STATUSES) . "'";
+    return "(CASE WHEN rental_status IN ($out) THEN GREATEST(due_date, CURDATE()) ELSE due_date END + INTERVAL " . TURNAROUND_DAYS . " DAY)";
+}
+
+/**
+ * การเช่าที่ทับช่วงที่ขอ แต่ละการเช่าถือกระเป๋าตั้งแต่วันเริ่มเช่าถึงก่อน hold_end_sql()
+ * ช่วงที่ขอคิดแบบเดียวกัน (วันเริ่ม ถึงก่อน วันเริ่ม + จำนวนวัน + TURNAROUND_DAYS)
+ * ทั้งสองช่วงไม่รวมวันสุดท้าย จึงทับกันเมื่อ เริ่มของแต่ละฝั่ง < สิ้นสุดของอีกฝั่ง
  * คืนค่ารายการช่วงที่ทับ แต่ละรายการมี rental_date และ busy_until (วันสุดท้ายที่กระเป๋าไม่ว่าง)
  */
 function booking_conflicts(mysqli $conn, string $product_id, string $rental_date, int $days): array
 {
     $statuses = "'" . implode("','", HOLDING_STATUSES) . "'";
-    $stmt = $conn->prepare("SELECT rental_date, due_date + INTERVAL " . (TURNAROUND_DAYS - 1) . " DAY AS busy_until
+    $hold_end = hold_end_sql();
+    $stmt = $conn->prepare("SELECT rental_date, $hold_end - INTERVAL 1 DAY AS busy_until
         FROM rentals
         WHERE product_id = ? AND rental_status IN ($statuses)
           AND rental_date < ? + INTERVAL ? DAY
-          AND ? < due_date + INTERVAL " . TURNAROUND_DAYS . " DAY
+          AND ? < $hold_end
         ORDER BY rental_date");
     $span = $days + TURNAROUND_DAYS;
     $stmt->bind_param('ssis', $product_id, $rental_date, $span, $rental_date);
@@ -214,10 +301,11 @@ function booking_conflicts(mysqli $conn, string $product_id, string $rental_date
 function booked_ranges(mysqli $conn, string $product_id): array
 {
     $statuses = "'" . implode("','", HOLDING_STATUSES) . "'";
-    $stmt = $conn->prepare("SELECT rental_date, due_date + INTERVAL " . (TURNAROUND_DAYS - 1) . " DAY AS busy_until
+    $hold_end = hold_end_sql();
+    $stmt = $conn->prepare("SELECT rental_date, $hold_end - INTERVAL 1 DAY AS busy_until
         FROM rentals
         WHERE product_id = ? AND rental_status IN ($statuses)
-          AND due_date + INTERVAL " . TURNAROUND_DAYS . " DAY > CURDATE()
+          AND $hold_end > CURDATE()
         ORDER BY rental_date");
     $stmt->bind_param('s', $product_id);
     $stmt->execute();

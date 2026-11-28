@@ -189,3 +189,13 @@ p { margin: 0 0 12px; }
 .demo-bar { background: #fff6e5; color: #7a4b00; border-bottom: 1px solid #f3d9a4; font-size: 0.88rem; padding: 8px 0; }
 .demo-bar code { background: rgba(0, 0, 0, 0.06); padding: 1px 6px; border-radius: 4px; font-size: 0.85rem; }
 .demo-bar a { color: #7a4b00; font-weight: 600; white-space: nowrap; }
+.reminder-bar { background: var(--primary-soft); color: var(--primary-dark); border-bottom: 1px solid var(--border); font-size: 0.92rem; padding: 10px 0; }
+.reminder-bar.urgent { background: var(--danger-soft); color: #b03a2e; }
+.reminder-bar a { color: inherit; font-weight: 600; white-space: nowrap; }
+.status-cell .hint { margin-top: 4px; max-width: 260px; }
+.inspect-form { display: flex; gap: 6px; flex-wrap: wrap; min-width: 340px; }
+.inspect-form input { padding: 6px 10px; font: inherit; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+.inspect-form input[type="number"] { width: 110px; }
+.inspect-form input[type="text"] { flex: 1 1 180px; }
+.inspect-actions { display: flex; gap: 6px; justify-content: flex-end; width: 100%; }
+.nowrap { white-space: nowrap; }

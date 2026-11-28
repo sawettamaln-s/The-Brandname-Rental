@@ -48,6 +48,7 @@ function page_start(string $title, string $area = 'shop', string $active = ''): 
     </div>
 </header>
 <?php demo_banner($base); ?>
+<?php if ($area === 'shop') { reminder_banner(); } ?>
 <main class="container page">
     <?php
 }
@@ -95,6 +96,25 @@ function admin_nav(): array
         ['key' => 'employees', 'label' => 'พนักงาน', 'href' => 'employees.php'],
         ['key' => 'logout', 'label' => 'ออกจากระบบ', 'post' => 'logout.php'],
     ];
+}
+
+/** แถบแจ้งเตือนวันคืนใต้ส่วนหัวของหน้าลูกค้า แสดงเมื่อมีกระเป๋าที่ครบกำหนดคืนพรุ่งนี้ วันนี้ หรือเกินกำหนด */
+function reminder_banner(): void
+{
+    global $conn;
+    if (empty($_SESSION['customers_id']) || !($conn instanceof mysqli)) {
+        return;
+    }
+    $reminders = due_reminders($conn, $_SESSION['customers_id']);
+    if (!$reminders) {
+        return;
+    }
+    $urgent = (bool) array_filter($reminders, fn($r) => $r['urgent']);
+    echo '<div class="reminder-bar' . ($urgent ? ' urgent' : '') . '"><div class="container">';
+    echo '<strong>แจ้งเตือนวันคืน</strong> ';
+    echo implode(' · ', array_map(fn($r) => e($r['text']), $reminders));
+    echo ' · <a href="profile.php#return-form">แจ้งเลขพัสดุส่งคืน</a>';
+    echo '</div></div>';
 }
 
 /** กล่องข้อความแจ้งผลจาก flash() หรือข้อความที่ส่งเข้ามาโดยตรง */
